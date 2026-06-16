@@ -66,10 +66,7 @@ std::vector<float> createCerjanVector(int Nboudary){ //generates the damping coe
 // media speeds
 //-------------------------------
 
-std::vector<std::vector<float>> velocity(int nx, int nz){
-
-    float c1 = 1500.0f;
-    float c2 = 2000.0f;
+std::vector<std::vector<float>> velocity(int nx, int nz, float c1, float c2){
 
     int interface_Z = nz/2;
 
@@ -159,7 +156,7 @@ std::vector<float> source(float f0, const std::vector<float>& t){
 //----------------------------------
 
 
-std::vector<std::vector<float>> derivates(std::vector<std::vector<float>>& c, float dt, float dx, float dz, const std::vector<float>& fonte, int nx, int nz, int nt, const std::vector<std::vector<float>>& f, int Nboudary){
+std::vector<std::vector<float>> derivates(std::vector<std::vector<float>>& c, float dt, float dx, float dz, const std::vector<float>& fonte, int nx, int nz, int nt, const std::vector<std::vector<float>>& f, int Nboudary, int sx, int sz){
 
     
      std::vector<std::vector<float>> u_old(nx, std::vector<float>(nz, 0.0)); //passed field
@@ -177,13 +174,6 @@ std::vector<std::vector<float>> derivates(std::vector<std::vector<float>>& c, fl
             e[i][j] = c[i][j] * dt / dx; //because dx == dz !!
         }
     }
-
-//----------------------------------
-// fountain position
-//----------------------------------
-
-    int sx = nx/2;
-    int sz = 100;
 
 //----------------------------------
 // RECEIVERS
@@ -314,8 +304,17 @@ int main(){
     float dx = 10.0; //space step in X
     float dz = 10.0; //space step in Z
     float dt = 0.0005; //time lapse 
-    float f0 = 30.0; //dominant frequency
+    float f0 = 15.0; //dominant frequency
 
+    //velocities
+
+    float c1 = 1500.0f;
+    float c2 = 4000.0f;
+
+    // Cerjan boudary
+
+    int Nboudary = 60; //number of the edge points
+    
     int nx = int(L/dx) + 1; //number of spatial points in X
     int nz = int(L/dz) + 1; //number of spatial points in Z
     int nt = int(T/dt) + 1; //number of temporal steps
@@ -324,9 +323,16 @@ int main(){
     std::vector<float> z = linspace(0.0, nz, nz);
     std::vector<float> t = linspace(0.0, (nt - 1) * dt, nt);
 
+    // fountain position
+
+    int sx = nx/2;
+    int sz = 100;
+
+    //user can't change
+
     //velocity
 
-    std::vector<std::vector<float>> c = velocity(nx, nz);
+    std::vector<std::vector<float>> c = velocity(nx, nz, c1, c2);
 
     //Save the documento of the velocity model
 
@@ -347,8 +353,6 @@ int main(){
 //------------------------------------
 //  CERJAN
 //------------------------------------
-
-int Nboudary = 60; //number of the edge points
 
 std::vector<float> A = createCerjanVector(Nboudary);
 
@@ -373,7 +377,7 @@ std::vector<std::vector<float>> f = AbsorbingBoudanry(Nboudary, nx, nz, A);
 
     std::vector<std::vector<float>> wavefield;
 
-    wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nt, f, Nboudary); 
+    wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nt, f, Nboudary, sx, sz); 
 
 //---------------------------------------
 // save binary document of the simulation

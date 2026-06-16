@@ -4,17 +4,22 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 #----------------------------------
-# plot one snap of the simulation
+# PARAMETERS
 #----------------------------------
 
-# parameters
 L = 5000
 dx = 10
 dz = 10
-T = 2.0
+T = 2.0 ##total simulation time
 
 nx = 501
 nz = 501
+
+nrec = 381
+
+#----------------------------------
+# plot one snap of the simulation
+#----------------------------------
 
 data = np.fromfile("snapshot_900.bin", dtype=np.float32)
 
@@ -91,9 +96,8 @@ plt.show()
 #----------------------------------
 # Plot the sismogram
 #----------------------------------
-nrec = 381
 
-data = np.fromfile("seismogram.bin", dtype=np.float32)
+data = np.fromfile("/home/processamento/acustica_2D/seismogram.bin", dtype=np.float32)
 
 nt = data.size // nrec
 
@@ -101,7 +105,9 @@ seismogram = data.reshape((nrec, nt), order="C")
 
 plt.figure(figsize=(10,8))
 
-plt.imshow(seismogram.T, cmap="gray", aspect="auto")
+vmax = np.percentile(np.abs(seismogram), 80)
+
+plt.imshow(seismogram.T, cmap="gray", aspect="auto", vmin=-vmax, vmax=vmax)
 
 plt.xlabel("Receiver")
 plt.ylabel("Time sample")
