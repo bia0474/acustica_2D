@@ -1,0 +1,3 @@
+
+# index	coordx	coordz
+0, 250.5, 100.0

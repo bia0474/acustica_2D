@@ -188,6 +188,7 @@ std::vector<std::vector<float>> derivates(std::vector<std::vector<float>>& c, fl
     for(int x = Nboudary; x < nx - Nboudary; x++){
         receivers.push_back({x, 60});
     }
+
 //----------------------------------
 // SEISMOGRAM
 //----------------------------------
@@ -253,8 +254,8 @@ std::vector<std::vector<float>> derivates(std::vector<std::vector<float>>& c, fl
         //----------------------------------
         // SAVE SNAPSHOT HERE (binary document)
         //----------------------------------
-
-        if(n % 100 == 0){
+         
+         if(n % 100 == 0){
             std::ofstream file("snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
 
             for(int j = 0; j < nx; j++){
@@ -264,7 +265,8 @@ std::vector<std::vector<float>> derivates(std::vector<std::vector<float>>& c, fl
 
             file.close();
         }
-
+         
+    
         //----------------------------------
         // advance in time
         //----------------------------------
@@ -276,8 +278,8 @@ std::vector<std::vector<float>> derivates(std::vector<std::vector<float>>& c, fl
     //-----------------------------------
     // SAVE THE DOCUMENT OF THE SISMOGRAM
     //-----------------------------------
-
-    std::ofstream file("seismogram.bin", std::ios::binary);
+    
+       std::ofstream file("seismogram.bin", std::ios::binary);
 
     for(int ir = 0; ir < nrec; ir++){
 
@@ -285,7 +287,7 @@ std::vector<std::vector<float>> derivates(std::vector<std::vector<float>>& c, fl
     }
 
     file.close();
-
+    
     return u_curr;
 }
 
