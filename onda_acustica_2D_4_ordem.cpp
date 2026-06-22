@@ -4,6 +4,49 @@
 #include <algorithm>
 #include <stdlib.h>
 
+/* 
+
+bool checkSources(float *sx, float *sz, int Nsource, int nx, int nz, int Nboundary){
+
+    for(int i = 0; i < Nsource; i++){
+
+        if(sx[i] < Nboundary || sx[i] >= nx - Nboundary || sz[i] < Nboundary || sz[i] >= nz - Nboundary){
+
+            std::cout << "Erro na posição da fonte " << i << std::endl;
+
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool checkReceivers(float *rx, float *rz, int nx, int nz, int Nboundary){
+
+    for(int i = 0; i < Nsource; i++){
+
+        if(rx[i] < Nboundary || rx[i] >= nx - Nboundary || rz[i] < Nboundary || rz[i] >= nz - Nboundary){
+
+            std::cout << "Erro na posição do receptor " << i << std::endl;
+
+            return false;
+        }
+    }
+
+    return true;
+}
+
+*/
+
+//-------------------------------
+// Struct of the receivers
+//-------------------------------
+
+    typedef struct{
+        int x;
+        int z;
+    } Receiver;
+
 //-------------------------------
 // Cerjan - absorving boudanry
 //-------------------------------
@@ -179,7 +222,7 @@ float* source(float f0, const float* t, int nt){
 //----------------------------------
 
 
-float* derivates(const float* c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nt, const float* f, int Nboudary, int sx, int sz){
+float* derivates(const float* c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nt, const float* f, int Nboudary, int sx, int sz, Receiver *receivers, int nrec){
 
     float *u_old = (float*) malloc(nx * nz * sizeof(float)); //passed field
     float *u_curr = (float*) malloc(nx * nz * sizeof(float)); //present field
@@ -206,25 +249,6 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
         }
     }
 
-//----------------------------------
-// RECEIVERS
-//----------------------------------
-
-   typedef struct{
-        int x;
-        int z;
-    } Receiver;
-
-    //the quantity of the receivers
-    int nrec = nx - 2 * Nboudary;
-
-    Receiver *receivers = (Receiver*) malloc(nrec * sizeof(Receiver));
-
-    for(int i = 0; i < nrec; i++){
-
-        receivers[i].x = Nboudary + i;
-        receivers[i].z = 60;
-    }
 
 //----------------------------------
 // SEISMOGRAM
@@ -281,12 +305,13 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
         // save the receiver
         //----------------------------------
 
-        for(int ir = 0; ir < nrec; ir++){
+        for(int i = 0; i < nrec; i++){
 
-            int xr = receivers[ir].x;
-            int zr = receivers[ir].z;
+            int xr = receivers[i].x;
+            int zr = receivers[i].z;
 
-            seismogram[ir * nt + n] = u_next[xr * nz + zr];
+            seismogram[i * nt + n] = u_next[xr * nz + zr];
+
         }
 
         //-------------------------------------
@@ -301,8 +326,6 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
 
             file.close();
         }
-
-        std::cout << "Snapshot binary file saved!" << std::endl;
         //----------------------------------
         // advance in time
         //----------------------------------
@@ -340,7 +363,6 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
     free(u_old);
     free(u_curr);
     free(u_next);
-    free(receivers);
     free(seismogram);
 
     return result;
@@ -389,16 +411,28 @@ int main(){
     int sx = nx/2;
     int sz = 100;
 
-    //user can't change
+//----------------------------------
+// RECEIVERS
+//----------------------------------
+    //the quantity of the receivers
+    int nrec = nx - 2 * Nboudary;
 
-    //velocity
+    Receiver *receivers = (Receiver*) malloc(nrec * sizeof(Receiver));
 
-    float *c = velocity(nx, nz, c1, c2, interface_Z);
+    for(int i = 0; i < nrec; i++){
+        receivers[i].x = Nboudary + i;
+        receivers[i].z = 60;
+    }
 
-    //source
+//user can't change
 
-    float *fonte = source(f0, t, nt);
+//velocity
 
+float *c = velocity(nx, nz, c1, c2, interface_Z);
+
+//source
+
+float *fonte = source(f0, t, nt);  
 //------------------------------------
 //  CERJAN
 //------------------------------------
@@ -424,7 +458,7 @@ float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
 // simulation 
 //----------------------------------
 
-    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nt, f, Nboudary, sx, sz); 
+    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nt, f, Nboudary, sx, sz, receivers, nrec); 
 
     
 //------------------------------------------
@@ -459,6 +493,7 @@ float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
     free(x);
     free(z);
     free(t);
+    free(receivers);
 
     return 0;
 
