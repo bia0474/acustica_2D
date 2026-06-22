@@ -16,7 +16,7 @@ nx = 501
 nz = 501
 
 nrec = 381
-
+"""
 #----------------------------------
 # plot one snap of the simulation
 #----------------------------------
@@ -71,7 +71,7 @@ frames = range(100, 3900, 100)
 ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
 
 plt.show()
-
+"""
 #----------------------------------
 # velocity model
 #----------------------------------
@@ -92,7 +92,7 @@ plt.ylabel("z (m)")
 plt.title("Velocity Model")
 
 plt.show()
-
+"""
 #----------------------------------
 # Plot the sismogram
 #----------------------------------
@@ -117,3 +117,4 @@ plt.title("Seismogram")
 plt.colorbar()
 
 plt.show()
+"""
