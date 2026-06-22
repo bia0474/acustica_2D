@@ -4,40 +4,6 @@
 #include <algorithm>
 #include <stdlib.h>
 
-/* 
-
-bool checkSources(float *sx, float *sz, int Nsource, int nx, int nz, int Nboundary){
-
-    for(int i = 0; i < Nsource; i++){
-
-        if(sx[i] < Nboundary || sx[i] >= nx - Nboundary || sz[i] < Nboundary || sz[i] >= nz - Nboundary){
-
-            std::cout << "Erro na posição da fonte " << i << std::endl;
-
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool checkReceivers(float *rx, float *rz, int nx, int nz, int Nboundary){
-
-    for(int i = 0; i < Nsource; i++){
-
-        if(rx[i] < Nboundary || rx[i] >= nx - Nboundary || rz[i] < Nboundary || rz[i] >= nz - Nboundary){
-
-            std::cout << "Erro na posição do receptor " << i << std::endl;
-
-            return false;
-        }
-    }
-
-    return true;
-}
-
-*/
-
 //-------------------------------
 // Struct of the receivers
 //-------------------------------
