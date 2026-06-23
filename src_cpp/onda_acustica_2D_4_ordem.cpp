@@ -1,6 +1,8 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <sstream>
+#include <string>
 #include <algorithm>
 #include <stdlib.h>
 
@@ -288,7 +290,11 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
 
             std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
 
-            file.write(reinterpret_cast<char*>(u_next), nx * nz * sizeof(float));
+            for(int x = Nboudary; x < nx - Nboudary; x++){
+
+                file.write(reinterpret_cast<char*>(&u_next[x * nz + Nboudary]), (nz - 2 * Nboudary) * sizeof(float)); //saves snaps without the absorbent border
+
+            }
 
             file.close();
         }
@@ -341,7 +347,7 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
 int main(){
     
 //----------------------------------
-// model parameters
+// open the document of PARAMETERS
 //----------------------------------
     float L = 5000.0; //model size
     int T = 2.0; //total simulation time
@@ -377,20 +383,75 @@ int main(){
     int sx = nx/2;
     int sz = 100;
 
+
+//user can't change
+
 //----------------------------------
-// RECEIVERS
+// open the document of RECEIVERS
 //----------------------------------
-    //the quantity of the receivers
+
     int nrec = nx - 2 * Nboudary;
 
     Receiver *receivers = (Receiver*) malloc(nrec * sizeof(Receiver));
 
-    for(int i = 0; i < nrec; i++){
-        receivers[i].x = Nboudary + i;
-        receivers[i].z = 60;
+    std::ifstream file_receivers("/home/processamento/acustica_2D/inputs/receivers.csv");
+
+    std::string linha;
+
+    std::getline(file_receivers, linha);
+
+    int i = 0;
+
+    while(std::getline(file_receivers, linha)){
+
+        std::stringstream ss(linha);
+
+        std::string index, rx, rz;
+
+        std::getline(ss, index, ',');
+        std::getline(ss, rx, ',');
+        std::getline(ss, rz, ',');
+
+        std::cout << rx << " " << rz << std::endl;
+
+        receivers[i].x = std::stoi(rx);
+        receivers[i].z = std::stoi(rz);
+        
+        i++;
     }
 
-//user can't change
+//------------------------------------------
+// open the document of the velocity model
+//-----------------------------------------
+
+    float *c = (float*) malloc(nx * nz * sizeof(float));
+
+    std::ifstream file_receivers("/home/processamento/acustica_2D/inputs/velocityModel.csv");
+
+    std::string linha;
+
+    std::getline(file_receivers, linha);
+
+    int i = 0;
+
+    while(std::getline(file_receivers, linha)){
+
+        std::stringstream ss(linha);
+
+        std::string index, rx, rz;
+
+        std::getline(ss, index, ',');
+        std::getline(ss, rx, ',');
+        std::getline(ss, rz, ',');
+
+        std::cout << rx << " " << rz << std::endl;
+
+        receivers[i].x = std::stoi(rx);
+        receivers[i].z = std::stoi(rz);
+        
+        i++;
+    }
+
 
 //velocity
 
@@ -426,26 +487,13 @@ float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
 
     float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nt, f, Nboudary, sx, sz, receivers, nrec); 
 
-    
-//------------------------------------------
-// Save the documento of the velocity model
-//-----------------------------------------
-
-    std::ofstream file_vel("home/processamento/acustica_2D/outputs/velocity.bin", std::ios::binary);
-
-    file_vel.write(reinterpret_cast<char*>(c), nx * nz * sizeof(float)); //"Pegue esse endereço e trate-o como um ponteiro para bytes."
-
-    file_vel.close();
-
-    std::cout << "Velocity Binary file saved!" << std::endl;
-
 //---------------------------------------
 // Save binary document of the simulation
 //---------------------------------------
 
     std::ofstream file("home/processamento/acustica_2D/outputs/wave.bin", std::ios::binary);
 
-    file.write(reinterpret_cast<char*>(wavefield), nx * nz * sizeof(float)); //"Pegue os bytes que formam a matriz wavefield e grave-os no arquivo exatamente como estão na memória."
+    file.write(reinterpret_cast<char*>(wavefield), nx * nz * sizeof(float)); 
 
     file.close();
 

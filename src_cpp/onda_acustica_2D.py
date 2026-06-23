@@ -12,8 +12,8 @@ dx = 10
 dz = 10
 T = 2.0 ##total simulation time
 
-nx = 501
-nz = 501
+nx = 381
+nz = 381
 
 nrec = 381
 
@@ -21,7 +21,7 @@ nrec = 381
 # plot one snap of the simulation
 #----------------------------------
 
-data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_900.bin", dtype=np.float32)
+data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
 
 wavefield = data.reshape((nx, nz))
 
@@ -44,7 +44,7 @@ plt.show()
 
 fig, ax = plt.subplots(figsize=(8,6))
 
-first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_100.bin", dtype=np.float32)
+first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
 first = first.reshape((nx, nz))
 
 img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto", animated=True)
@@ -75,14 +75,16 @@ plt.show()
 #----------------------------------
 # velocity model
 #----------------------------------
+nx_complete_model = 501
+nz_complete_model = 501
 
 vel = np.fromfile("/home/processamento/acustica_2D/inputs/velocity.bin", dtype=np.float32)
 
-vel = vel.reshape((nx, nz))
+vel = vel.reshape((nx_complete_model, nz_complete_model))
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(vel.T, origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto")
+plt.imshow(vel.T, origin="upper", extent=[0, nx_complete_model*dx, nz_complete_model*dz, 0], aspect="auto")
 
 plt.colorbar(label="Velocity (m/s)")
 

@@ -75,8 +75,9 @@ int main(){
 
     int interface_Z = nz/2;
 
-    float *c = velocity(nx, nz, c1, c2, interface_Z);
+    float *c = (float*) malloc(nx * nz * sizeof(float));
 
+    c = velocity(nx, nz, c1, c2, interface_Z);
 //----------------------------------
 // CFL check
 //----------------------------------
@@ -94,13 +95,24 @@ int main(){
 // Save the documento of the velocity model
 //-----------------------------------------
 
-    std::ofstream file_vel("/home/processamento/acustica_2D/inputs/velocity.bin", std::ios::binary);
+    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModel.csv", "w"); //cria um ponteiro para um arquivo e abre um arquivo chamado "sources.csv" no modo write("w") (escrita)
 
-    file_vel.write(reinterpret_cast<char*>(c), nx * nz * sizeof(float)); //"Pegue esse endereço e trate-o como um ponteiro para bytes."
+    if(file_velocities == NULL){
+        printf("Erro ao abrir sources.csv\n");
+        return 1;
+    }
 
-    file_vel.close();
+    fprintf(file_velocities, "c\n"); //escrevendo o cabeçalho
 
-    std::cout << "Velocity Binary file saved!" << std::endl;
+    for(int i = 0; i < nx * nz; i++){
+
+        fprintf(file_velocities, "%d,%d,%.1f,%.1f\n", c[i]);
+
+    }
+
+    fclose(file_velocities);
+
+    std::cout << "Velocity csv file saved!" << std::endl;
 
     free(c);
 
