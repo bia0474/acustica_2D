@@ -51,7 +51,7 @@ int main(){
     // PARAMETERS DATA in json
     //----------------------------------
 
-    FILE *file = fopen("parameters.json", "w");
+    FILE *file = fopen("/home/processamento/acustica_2D/inputs/parameters.json", "w");
 
     fprintf(file, "{\n");
     fprintf(file, "    \"L\": %.1f,\n", L);

@@ -105,7 +105,7 @@ int main(){
     // SOURCES DATA in csv
     //----------------------------------
 
-    FILE *file_sources = fopen("sources.csv", "w"); //cria um ponteiro para um arquivo e abre um arquivo chamado "sources.csv" no modo write("w") (escrita)
+    FILE *file_sources = fopen("/home/processamento/acustica_2D/inputs/sources.csv", "w"); //cria um ponteiro para um arquivo e abre um arquivo chamado "sources.csv" no modo write("w") (escrita)
 
     if(file_sources == NULL){
         printf("Erro ao abrir sources.csv\n");
@@ -125,7 +125,7 @@ int main(){
     // RECEIVERS DATA in csv
     //----------------------------------
 
-    FILE *file_receivers = fopen("receivers.csv", "w"); //cria um ponteiro para um arquivo e abre um arquivo chamado "receivers.csv" no modo write("w") (escrita)
+    FILE *file_receivers = fopen("/home/processamento/acustica_2D/inputs/receivers.csv", "w"); //cria um ponteiro para um arquivo e abre um arquivo chamado "receivers.csv" no modo write("w") (escrita)
 
     fprintf(file_receivers, "index,coordx,coordz\n"); //escrevendo o cabeçalho
 

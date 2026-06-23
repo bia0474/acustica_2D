@@ -16,12 +16,12 @@ nx = 501
 nz = 501
 
 nrec = 381
-"""
+
 #----------------------------------
 # plot one snap of the simulation
 #----------------------------------
 
-data = np.fromfile("snapshot_900.bin", dtype=np.float32)
+data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_900.bin", dtype=np.float32)
 
 wavefield = data.reshape((nx, nz))
 
@@ -44,7 +44,7 @@ plt.show()
 
 fig, ax = plt.subplots(figsize=(8,6))
 
-first = np.fromfile("snapshot_100.bin", dtype=np.float32)
+first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_100.bin", dtype=np.float32)
 first = first.reshape((nx, nz))
 
 img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto", animated=True)
@@ -58,7 +58,7 @@ ax.set_title("2D Acoustic Wave")
 
 def update(frame):
 
-    data = np.fromfile(f"snapshot_{frame}.bin", dtype=np.float32)
+    data = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_{frame}.bin", dtype=np.float32)
 
     wavefield = data.reshape((nx, nz))
 
@@ -71,12 +71,12 @@ frames = range(100, 3900, 100)
 ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
 
 plt.show()
-"""
+
 #----------------------------------
 # velocity model
 #----------------------------------
 
-vel = np.fromfile("velocity.bin", dtype=np.float32)
+vel = np.fromfile("/home/processamento/acustica_2D/inputs/velocity.bin", dtype=np.float32)
 
 vel = vel.reshape((nx, nz))
 
@@ -92,12 +92,12 @@ plt.ylabel("z (m)")
 plt.title("Velocity Model")
 
 plt.show()
-"""
+
 #----------------------------------
 # Plot the sismogram
 #----------------------------------
 
-data = np.fromfile("/home/processamento/acustica_2D/seismogram.bin", dtype=np.float32)
+data = np.fromfile("/home/processamento/acustica_2D/outputs/seismogram.bin", dtype=np.float32)
 
 nt = data.size // nrec
 
@@ -117,4 +117,3 @@ plt.title("Seismogram")
 plt.colorbar()
 
 plt.show()
-"""

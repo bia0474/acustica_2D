@@ -286,7 +286,7 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
          
          if(n % 100 == 0){
 
-            std::ofstream file("snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
+            std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
 
             file.write(reinterpret_cast<char*>(u_next), nx * nz * sizeof(float));
 
@@ -307,7 +307,7 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
     // SAVE THE DOCUMENT OF THE SISMOGRAM
     //-----------------------------------
             
-    std::ofstream file("seismogram.bin", std::ios::binary);
+    std::ofstream file("/home/processamento/acustica_2D/outputs/seismogram.bin", std::ios::binary);
 
     file.write(reinterpret_cast<char*>(seismogram), nrec * nt * sizeof(float));
 
@@ -431,7 +431,7 @@ float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
 // Save the documento of the velocity model
 //-----------------------------------------
 
-    std::ofstream file_vel("velocity.bin", std::ios::binary);
+    std::ofstream file_vel("home/processamento/acustica_2D/outputs/velocity.bin", std::ios::binary);
 
     file_vel.write(reinterpret_cast<char*>(c), nx * nz * sizeof(float)); //"Pegue esse endereço e trate-o como um ponteiro para bytes."
 
@@ -443,7 +443,7 @@ float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
 // Save binary document of the simulation
 //---------------------------------------
 
-    std::ofstream file("wave.bin", std::ios::binary);
+    std::ofstream file("home/processamento/acustica_2D/outputs/wave.bin", std::ios::binary);
 
     file.write(reinterpret_cast<char*>(wavefield), nx * nz * sizeof(float)); //"Pegue os bytes que formam a matriz wavefield e grave-os no arquivo exatamente como estão na memória."
 

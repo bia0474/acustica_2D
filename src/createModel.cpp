@@ -94,7 +94,7 @@ int main(){
 // Save the documento of the velocity model
 //-----------------------------------------
 
-    std::ofstream file_vel("velocity.bin", std::ios::binary);
+    std::ofstream file_vel("/home/processamento/acustica_2D/inputs/velocity.bin", std::ios::binary);
 
     file_vel.write(reinterpret_cast<char*>(c), nx * nz * sizeof(float)); //"Pegue esse endereço e trate-o como um ponteiro para bytes."
 
