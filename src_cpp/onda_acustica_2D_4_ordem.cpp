@@ -95,30 +95,6 @@ float* createCerjanVector(int Nboudary){ //generates the damping coefficients
     return A;   
 }
 
-//-------------------------------
-// media speeds
-//-------------------------------
-
-float* velocity(int nx, int nz, float c1, float c2, int interface_Z){
-
-    float *velocity = (float*) malloc(nx * nz * sizeof(float));
-
-    for(int i = 0; i < nx; i++){
-
-        for(int j = 0; j < nz; j++){
-
-            if(j < interface_Z){
-                velocity[i * nz + j] = c1;
-            }
-            else{
-                velocity[i * nz + j] = c2;
-            }
-        }
-    }
-
-    return velocity;
-}
-
 //----------------------------------
 // linscpace function
 //----------------------------------
@@ -135,34 +111,6 @@ float* linspace(float start, int end, int quantity){//this function calculates t
     }
 
     return number;
-}
-
-//----------------------------------
-// CFL condition
-//----------------------------------
-
-
-bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //function of the stability codition
-
-    float cmax = 0.0f;
-
-    for(int i = 0; i < nx; i++){
-
-        for(int j = 0; j < nz; j++){
-
-            cmax = std::max(cmax, c[i * nz + j]);
-        }
-    }
-
-    float courant = cmax * dt / dx;
-
-    if(courant > 0.7f){
-
-        std::cout << "ERROR! NOT STABLE" << std::endl;
-        return false;
-    }
-
-    return true;
 }
 
 //----------------------------------
@@ -190,13 +138,13 @@ float* source(float f0, const float* t, int nt){
 //----------------------------------
 
 
-float* derivates(const float* c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nt, const float* f, int Nboudary, int sx, int sz, Receiver *receivers, int nrec){
+float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nt, const float* f, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
 
     float *u_old = (float*) malloc(nx * nz * sizeof(float)); //passed field
     float *u_curr = (float*) malloc(nx * nz * sizeof(float)); //present field
     float *u_next = (float*) malloc(nx * nz * sizeof(float)); //future field
 
-    for(int i = 0; i < nx * nz; i++){
+    for(int i = 0; i < nx * nz; i++){ //inicialization
 
         u_old[i] = 0.0f;
         u_curr[i] = 0.0f;
@@ -216,7 +164,6 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
             e[i * nz + j] = c[i * nz + j] * dt / dx; //because dx == dz !!
         }
     }
-
 
 //----------------------------------
 // SEISMOGRAM
@@ -253,9 +200,11 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
         // source injection
         //----------------------------------
 
-        //adds energy to the grid
-        u_next[sx * nz + sz] += fonte[n]; 
-
+        for(int k = 0; k < Nsource; k++){
+            //adds energy to the grid
+            u_next[sx[k] * nz + sz[k]] += fonte[n]; 
+        }
+      
         //----------------------------------
         // CERJAN
         //----------------------------------
@@ -332,6 +281,7 @@ float* derivates(const float* c, float dt, float dx, float dz, const float* font
         result[i] = u_curr[i];
     }
 
+    free(e);
     free(u_old);
     free(u_curr);
     free(u_next);
@@ -357,11 +307,6 @@ int main(){
     float dt = 0.0005; //time lapse 
     float f0 = 15.0; //dominant frequency
 
-    //speeds
-
-    float c1 = 1500.0f;
-    float c2 = 4000.0f;
-
     //Cerjan boudary
 
     int Nboudary = 60; //number of the edge points
@@ -370,31 +315,25 @@ int main(){
     int nz = int(L/dz) + 1; //number of spatial points in Z
     int nt = int(T/dt) + 1; //number of temporal steps
 
-    //interface em Z
-
-    int interface_Z = nz/2;
+    int nrec = nx - 2 * Nboudary;
+    int Nsource = 1;
     
     float *x = linspace(0.0, nx, nx);
     float *z = linspace(0.0, nz, nz);
     float *t = linspace(0.0, (nt - 1) * dt, nt);
 
-    //fountain position
-
-    int sx = nx/2;
-    int sz = 100;
-
-
-//user can't change
-
 //----------------------------------
 // open the document of RECEIVERS
 //----------------------------------
 
-    int nrec = nx - 2 * Nboudary;
-
     Receiver *receivers = (Receiver*) malloc(nrec * sizeof(Receiver));
 
     std::ifstream file_receivers("/home/processamento/acustica_2D/inputs/receivers.csv");
+
+    if(!file_receivers.is_open()){
+        std::cout << "Erro ao abrir receivers.csv\n";
+        return 1;
+    }
 
     std::string linha;
 
@@ -411,8 +350,6 @@ int main(){
         std::getline(ss, index, ',');
         std::getline(ss, rx, ',');
         std::getline(ss, rz, ',');
-
-        std::cout << rx << " " << rz << std::endl;
 
         receivers[i].x = std::stoi(rx);
         receivers[i].z = std::stoi(rz);
@@ -421,45 +358,82 @@ int main(){
     }
 
 //------------------------------------------
-// open the document of the velocity model
+// open the document of the VELOCITY MODEL
 //-----------------------------------------
 
     float *c = (float*) malloc(nx * nz * sizeof(float));
 
-    std::ifstream file_receivers("/home/processamento/acustica_2D/inputs/velocityModel.csv");
+    std::ifstream file_velocity("/home/processamento/acustica_2D/inputs/velocityModel.csv");
 
-    std::string linha;
-
-    std::getline(file_receivers, linha);
-
-    int i = 0;
-
-    while(std::getline(file_receivers, linha)){
-
-        std::stringstream ss(linha);
-
-        std::string index, rx, rz;
-
-        std::getline(ss, index, ',');
-        std::getline(ss, rx, ',');
-        std::getline(ss, rz, ',');
-
-        std::cout << rx << " " << rz << std::endl;
-
-        receivers[i].x = std::stoi(rx);
-        receivers[i].z = std::stoi(rz);
-        
-        i++;
+    if(!file_velocity.is_open()){
+        std::cout << "Erro ao abrir velocityModel.csv\n";
+        return 1;
     }
 
+    std::string linha2;
 
-//velocity
+    std::getline(file_velocity, linha2);
 
-float *c = velocity(nx, nz, c1, c2, interface_Z);
+    int j = 0;
 
-//source
+    while(std::getline(file_velocity, linha2)){
 
-float *fonte = source(f0, t, nt);  
+        std::stringstream ss(linha2);
+
+        std::string velocity;
+
+        int k = 0;
+
+        while(std::getline(ss, velocity, ',')){
+
+            c[j * nz + k] = std::stof(velocity);
+
+            k++;
+        }
+        j++;
+    }
+
+    float *fonte = source(f0, t, nt); 
+
+//------------------------------------------
+// open the document of the SOURCE
+//-----------------------------------------
+
+    int *sx = (int*) malloc(Nsource * sizeof(int));
+    int *sz = (int*) malloc(Nsource * sizeof(int));
+
+    std::ifstream file_source("/home/processamento/acustica_2D/inputs/sources.csv");
+
+    if(!file_source.is_open()){
+        std::cout << "Erro ao abrir sources.csv\n";
+        return 1;
+    }
+
+    std::string linha3;
+
+    std::getline(file_source, linha3);
+
+    int h = 0;
+
+    while(std::getline(file_source, linha3)){
+
+        std::stringstream ss(linha3);
+
+        std::string index_str;
+        std::string sx_str; 
+        std::string sz_str;
+
+        std::getline(ss, index_str, ',');
+        std::getline(ss, sx_str, ',');
+        std::getline(ss, sz_str, ',');
+
+        sx[h] = std::stoi(sx_str);
+        sz[h] = std::stoi(sz_str);
+
+        h++;
+    }
+
+    
 //------------------------------------
 //  CERJAN
 //------------------------------------
@@ -469,29 +443,16 @@ float *A = createCerjanVector(Nboudary);
 float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
 
 //----------------------------------
-// CFL check
+// wavefield
 //----------------------------------
 
-    if(CFL(c, dt, dx, dz, nx, nz)){
-
-        std::cout << "Stable simulation" << std::endl;
-    }
-    else{
-
-        return 1;
-    }
-
-//----------------------------------
-// simulation 
-//----------------------------------
-
-    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nt, f, Nboudary, sx, sz, receivers, nrec); 
+    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nt, f, Nboudary, sx, sz, Nsource, receivers, nrec); 
 
 //---------------------------------------
 // Save binary document of the simulation
 //---------------------------------------
 
-    std::ofstream file("home/processamento/acustica_2D/outputs/wave.bin", std::ios::binary);
+    std::ofstream file("/home/processamento/acustica_2D/outputs/wave.bin", std::ios::binary);
 
     file.write(reinterpret_cast<char*>(wavefield), nx * nz * sizeof(float)); 
 
@@ -508,6 +469,8 @@ float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
     free(z);
     free(t);
     free(receivers);
+    free(sx);
+    free(sz);
 
     return 0;
 

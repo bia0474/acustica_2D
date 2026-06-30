@@ -42,10 +42,12 @@ int main(){
     int nz = int(L/dz) + 1; //number of spatial points in Z
     int nt = int(T/dt) + 1; //number of temporal steps
 
-    //fountain position
+    float *x = linspace(0.0, nx, nx);
+    float *z = linspace(0.0, nz, nz);
+    float *t = linspace(0.0, (nt - 1) * dt, nt);
 
-    int sx = nx/2;
-    int sz = 100;
+    int nrec = nx - 2 * Nboudary;
+    int Nsource = 1;
 
     //----------------------------------
     // PARAMETERS DATA in json
@@ -59,16 +61,20 @@ int main(){
     fprintf(file, "    \"nx\": %d,\n", nx);
     fprintf(file, "    \"nz\": %d,\n", nz);
     fprintf(file, "    \"nt\": %d,\n", nt);
+    fprintf(file, "    \"x\": %.1f,\n", x);
+    fprintf(file, "    \"z\": %.1f,\n", z);
+    fprintf(file, "    \"t\": %.1f,\n", t);
     fprintf(file, "    \"dx\": %.1f,\n", dx);
     fprintf(file, "    \"dz\": %.1f,\n", dz);
     fprintf(file, "    \"dt\": %.1f\n", dt);
     fprintf(file, "    \"f0\": %.1f\n", f0);
     fprintf(file, "    \"Nboudary\": %d,\n", Nboudary);
-    fprintf(file, "    \"sx\": %d,\n", sx);
-    fprintf(file, "    \"sz\": %d,\n", sz);
+    fprintf(file, "    \"nrec\": %d\n", nrec);
+    fprintf(file, "    \"Nsource\": %d\n", Nsource);
 
-    fprintf(file, "    \"sources_file\": \"sources.csv\",\n");
-    fprintf(file, "    \"receivers_file\": \"receivers.csv\"\n");
+    fprintf(file, "    \"sources_file\": \"/home/processamento/acustica_2D/inputs/sources.csv\",\n");
+    fprintf(file, "    \"receivers_file\": \"/home/processamento/acustica_2D/inputs/receivers.csv\",\n");
+    fprintf(file, "    \"velocity_file\": \"/home/processamento/acustica_2D/inputs/velocityModel.csv\"\n");
 
     fprintf(file, "}\n");
 

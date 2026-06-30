@@ -5,11 +5,11 @@
 // linscpace function
 //----------------------------------
 
-float* linspace(int start, int end, int quantity, int endpoint){
+int* linspace(int start, int end, int quantity, int endpoint){
 
-    float *number = (float*) malloc(quantity * sizeof(float));
+    int *number = (int*) malloc(quantity * sizeof(int));
 
-    float dx;
+    int dx;
 
     if(quantity == 1){
         
@@ -41,9 +41,9 @@ int main(){
     int sx_end = 250;
     int Nsource = 1;
 
-    float *sx = linspace(sx_init, sx_end, Nsource, 0);
+    int *sx = linspace(sx_init, sx_end, Nsource, 0);
 
-    float *sz = (float*) malloc(Nsource * sizeof(float));
+    int *sz = (int*) malloc(Nsource * sizeof(int));
 
     if(sz == NULL){
         printf("Erro ao alocar memoria\n");
@@ -75,9 +75,9 @@ int main(){
     int rx_end = 440;
     int Nrec = 381;
 
-    float *rx = linspace(rx_init, rx_end, Nrec, 1);
+    int *rx = linspace(rx_init, rx_end, Nrec, 1);
 
-    float *rz = (float*) malloc(Nrec * sizeof(float));
+    int *rz = (int*) malloc(Nrec * sizeof(int));
 
     if(rz == NULL){
         printf("Erro ao alocar memoria\n");
@@ -116,7 +116,7 @@ int main(){
 
     for(int i = 0; i < Nsource; i++){
 
-        fprintf(file_sources, "%d,%.1f,%.1f\n", i, sx[i], sz[i]);
+        fprintf(file_sources, "%d,%d,%d\n", i, sx[i], sz[i]);
     }
 
     fclose(file_sources);
@@ -131,7 +131,7 @@ int main(){
 
     for(int i = 0; i < Nrec; i++){
 
-        fprintf(file_receivers, "%d,%.1f,%.1f\n", i, rx[i], rz[i]);
+        fprintf(file_receivers, "%d,%d,%d\n", i, rx[i], rz[i]);
     }
 
     fclose(file_receivers);

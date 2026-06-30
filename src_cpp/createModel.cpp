@@ -104,10 +104,17 @@ int main(){
 
     fprintf(file_velocities, "c\n"); //escrevendo o cabeçalho
 
-    for(int i = 0; i < nx * nz; i++){
+    for(int i = 0; i < nx; i++){
+        for(int j = 0; j < nz; j++){
+            
+            fprintf(file_velocities, "%.1f", c[i * nz + j]);
 
-        fprintf(file_velocities, "%d,%d,%.1f,%.1f\n", c[i]);
+            if(j < nz - 1){
+                fprintf(file_velocities, ",");
+            }
+        }
 
+        fprintf(file_velocities, "\n");
     }
 
     fclose(file_velocities);

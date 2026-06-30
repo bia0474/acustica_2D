@@ -75,10 +75,11 @@ plt.show()
 #----------------------------------
 # velocity model
 #----------------------------------
+
 nx_complete_model = 501
 nz_complete_model = 501
 
-vel = np.fromfile("/home/processamento/acustica_2D/inputs/velocity.bin", dtype=np.float32)
+vel = np.loadtxt("/home/processamento/acustica_2D/inputs/velocityModel.csv", delimiter=",", skiprows=1)
 
 vel = vel.reshape((nx_complete_model, nz_complete_model))
 
