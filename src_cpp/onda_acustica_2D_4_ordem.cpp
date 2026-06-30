@@ -137,7 +137,6 @@ float* source(float f0, const float* t, int nt){
 // Wave equation
 //----------------------------------
 
-
 float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nt, const float* f, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
 
     float *u_old = (float*) malloc(nx * nz * sizeof(float)); //passed field
@@ -299,24 +298,62 @@ int main(){
 //----------------------------------
 // open the document of PARAMETERS
 //----------------------------------
-    float L = 5000.0; //model size
-    int T = 2.0; //total simulation time
 
-    float dx = 10.0; //space step in X
-    float dz = 10.0; //space step in Z
-    float dt = 0.0005; //time lapse 
-    float f0 = 15.0; //dominant frequency
+    FILE *file_parameters = fopen("/home/processamento/acustica_2D/inputs/parameters.txt", "r");
 
-    //Cerjan boudary
-
-    int Nboudary = 60; //number of the edge points
+    if(file_parameters == NULL){
+        printf("Erro ao abrir arquivo de parametros\n");
+        return 1;
+    }
     
+    char receivers_file[256];
+    char sources_file[256];
+    char velocity_file[256];
+    char linha[256];
+
+    float L = 0.0f;
+    float dx = 0.0f;
+    float dz = 0.0f;
+    float dt = 0.0f;
+    float f0 = 0.0f;
+
+    int T = 0;
+    int Nboudary = 0;
+    int Nsource = 0;
+    int nrec = 0;
+
+    while(fgets(linha, sizeof(linha), file_parameters)){
+
+        if(sscanf(linha, "L = %f", &L) == 1) continue;
+
+        if(sscanf(linha, "T = %d", &T) == 1) continue;
+
+        if(sscanf(linha, "dx = %f", &dx) == 1) continue;
+
+        if(sscanf(linha, "dz = %f", &dz) == 1) continue;
+
+        if(sscanf(linha, "dt = %f", &dt) == 1) continue;
+
+        if(sscanf(linha, "f0 = %f", &f0) == 1) continue;
+
+        if(sscanf(linha, "Nboudary = %d", &Nboudary) == 1) continue;
+
+        if(sscanf(linha, "nrec = %d", &nrec) == 1) continue;
+
+        if(sscanf(linha, "Nsource = %d", &Nsource) == 1) continue;
+
+        if(sscanf(linha, "receivers_file = %255s", receivers_file) == 1) continue;
+
+        if(sscanf(linha, "sources_file = %255s", sources_file) == 1) continue;
+
+        if(sscanf(linha, "velocity_file = %255s", velocity_file) == 1) continue;
+    }
+
+    fclose(file_parameters);
+
     int nx = int(L/dx) + 1; //number of spatial points in X
     int nz = int(L/dz) + 1; //number of spatial points in Z
     int nt = int(T/dt) + 1; //number of temporal steps
-
-    int nrec = nx - 2 * Nboudary;
-    int Nsource = 1;
     
     float *x = linspace(0.0, nx, nx);
     float *z = linspace(0.0, nz, nz);
@@ -328,22 +365,22 @@ int main(){
 
     Receiver *receivers = (Receiver*) malloc(nrec * sizeof(Receiver));
 
-    std::ifstream file_receivers("/home/processamento/acustica_2D/inputs/receivers.csv");
+    std::ifstream file_receivers(receivers_file);
 
     if(!file_receivers.is_open()){
         std::cout << "Erro ao abrir receivers.csv\n";
         return 1;
     }
 
-    std::string linha;
+    std::string linha1;
 
-    std::getline(file_receivers, linha);
+    std::getline(file_receivers, linha1);
 
     int i = 0;
 
-    while(std::getline(file_receivers, linha)){
+    while(std::getline(file_receivers, linha1)){
 
-        std::stringstream ss(linha);
+        std::stringstream ss(linha1);
 
         std::string index, rx, rz;
 
@@ -363,7 +400,7 @@ int main(){
 
     float *c = (float*) malloc(nx * nz * sizeof(float));
 
-    std::ifstream file_velocity("/home/processamento/acustica_2D/inputs/velocityModel.csv");
+    std::ifstream file_velocity(velocity_file);
 
     if(!file_velocity.is_open()){
         std::cout << "Erro ao abrir velocityModel.csv\n";
@@ -402,7 +439,7 @@ int main(){
     int *sx = (int*) malloc(Nsource * sizeof(int));
     int *sz = (int*) malloc(Nsource * sizeof(int));
 
-    std::ifstream file_source("/home/processamento/acustica_2D/inputs/sources.csv");
+    std::ifstream file_source(sources_file);
 
     if(!file_source.is_open()){
         std::cout << "Erro ao abrir sources.csv\n";
@@ -433,7 +470,6 @@ int main(){
         h++;
     }
 
-    
 //------------------------------------
 //  CERJAN
 //------------------------------------

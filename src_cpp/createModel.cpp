@@ -57,27 +57,47 @@ bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //functi
 }
 int main(){
 
-    float L = 5000.0; //model size
+    //----------------------------------
+    // open the document of PARAMETERS
+    //----------------------------------
 
-    float dx = 10.0; //space step in X
-    float dz = 10.0; //space step in Z
-    float dt = 0.0005; //time lapse
+    FILE *file_parameters = fopen("/home/processamento/acustica_2D/inputs/parameters.txt", "r");
 
-    int nx = int(L/dx) + 1; //number of spatial points in X
-    int nz = int(L/dz) + 1; //number of spatial points in Z
+    if(file_parameters == NULL){
+        printf("Erro ao abrir arquivo de parametros\n");
+        return 1;
+    }
 
-    //speeds
+    char linha[256];
 
-    float c1 = 1500.0f;
-    float c2 = 4000.0f;
+    float L = 0.0f;
+    float dx = 0.0f;
+    float dz = 0.0f;
+    float dt = 0.0f;
+    float c1 = 0.0f;
+    float c2 = 0.0f;
+    int interface_Z = 0;
 
-    //interface in Z
+    while(fgets(linha, sizeof(linha), file_parameters)){
 
-    int interface_Z = nz/2;
+        sscanf(linha, "L = %f", &L);
+        sscanf(linha, "dx = %f", &dx);
+        sscanf(linha, "dz = %f", &dz);
+        sscanf(linha, "dt = %f", &dt);
 
-    float *c = (float*) malloc(nx * nz * sizeof(float));
+        sscanf(linha, "c1 = %f", &c1);
+        sscanf(linha, "c2 = %f", &c2);
 
-    c = velocity(nx, nz, c1, c2, interface_Z);
+        sscanf(linha, "interface_Z = %d", &interface_Z);
+    }
+
+    fclose(file_parameters);
+
+    int nx = (int)(L/dx) + 1;
+    int nz = (int)(L/dz) + 1;
+
+    float *c = velocity(nx, nz, c1, c2, interface_Z);
+
 //----------------------------------
 // CFL check
 //----------------------------------

@@ -33,13 +33,41 @@ int* linspace(int start, int end, int quantity, int endpoint){
 
 int main(){
 
+    //----------------------------------
+    // open the document of PARAMETERS
+    //----------------------------------
+
+    FILE *file = fopen("/home/processamento/acustica_2D/inputs/parameters.txt", "r");
+
+    if(file == NULL){
+        printf("Erro ao abrir arquivo de parametros\n");
+        return 1;
+    }
+
+    char linha[256];
+
+    int Nrec = 0;
+    int Nsource = 0;
+
+    while(fgets(linha, sizeof(linha), file)){
+
+        if(sscanf(linha, "nrec = %d", &Nrec) == 1){
+            continue;
+        }
+
+        if(sscanf(linha, "Nsource = %d", &Nsource) == 1){
+            continue;
+        }
+    }
+
+    fclose(file);
+
     //-------------------------------
     // Sources
     //-------------------------------
 
     int sx_init = 0;
     int sx_end = 250;
-    int Nsource = 1;
 
     int *sx = linspace(sx_init, sx_end, Nsource, 0);
 
@@ -73,7 +101,6 @@ int main(){
 
     int rx_init = 60;
     int rx_end = 440;
-    int Nrec = 381;
 
     int *rx = linspace(rx_init, rx_end, Nrec, 1);
 
