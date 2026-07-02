@@ -10,7 +10,7 @@ import matplotlib.animation as animation
 L = 5000
 dx = 10
 dz = 10
-T = 2.0 ##total simulation time
+T = 2.0 #total simulation time
 
 nx = 381
 nz = 381

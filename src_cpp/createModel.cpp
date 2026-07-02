@@ -115,14 +115,14 @@ int main(){
 // Save the documento of the velocity model
 //-----------------------------------------
 
-    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModel.csv", "w"); //cria um ponteiro para um arquivo e abre um arquivo chamado "sources.csv" no modo write("w") (escrita)
+    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModel.csv", "w"); //Creates a pointer to a file and opens a file named "sources.csv" in write mode (w)
 
     if(file_velocities == NULL){
         printf("Erro ao abrir sources.csv\n");
         return 1;
     }
 
-    fprintf(file_velocities, "c\n"); //escrevendo o cabeçalho
+    fprintf(file_velocities, "c\n"); //writing the header
 
     for(int i = 0; i < nx; i++){
         for(int j = 0; j < nz; j++){
