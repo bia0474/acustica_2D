@@ -1,5 +1,33 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <iostream>
+
+//----------------------------------
+// check geometry function
+//----------------------------------
+
+bool checkGeometry(const int *sx, const int *sz, int Nsource, const int *rx, const int *rz, int Nrec, int nx, int nz, int Nboudary){
+
+    for(int i = 0; i < Nsource; i++){
+        
+        if(sx[i] < Nboudary || sx[i] >= nx - Nboudary || sz[i] < Nboudary || sz[i] >= nz - Nboudary){
+            
+            std::cout << "Erro: Fonte " << i << " esta dentro da borda de absorcao.\n";
+            return false;
+        }
+    }
+
+    for(int j = 0; j < Nrec; j++){
+
+        if(rx[j] < Nboudary || rx[j] >= nx - Nboudary || rz[j] < Nboudary || rz[j] >= nz - Nboudary){
+
+            std::cout << "Erro: Receptor " << j << " esta dentro da borda de absorcao.\n";
+            return false;
+        }
+    }
+
+    return true;
+}
 
 //----------------------------------
 // linscpace function
@@ -48,6 +76,9 @@ int main(){
 
     int Nrec = 0;
     int Nsource = 0;
+    int nx = 0;
+    int nz = 0;
+    int Nboudary = 0;
 
     while(fgets(linha, sizeof(linha), file)){
 
@@ -56,6 +87,18 @@ int main(){
         }
 
         if(sscanf(linha, "Nsource = %d", &Nsource) == 1){
+            continue;
+        }
+
+        if(sscanf(linha, "nx = %d", &nx) == 1){
+            continue;
+        }
+
+        if(sscanf(linha, "nz = %d", &nz) == 1){
+            continue;
+        }
+
+        if(sscanf(linha, "Nboudary = %d", &Nboudary) == 1){
             continue;
         }
     }
@@ -73,14 +116,14 @@ int main(){
 
     int *sz = (int*) malloc(Nsource * sizeof(int));
 
-    if(sz == NULL){
-        printf("Erro ao alocar memoria\n");
-        return 1;
-    }
-
     for(int i = 0; i < Nsource; i++){
 
         sz[i] = 100.0f;
+    }
+
+    if(sz == NULL){
+        printf("Erro ao alocar memoria\n");
+        return 1;
     }
 
     int *sIdx = (int*) malloc(Nsource * sizeof(int));
@@ -126,6 +169,14 @@ int main(){
     for(int i = 0; i < Nrec; i++){
 
         rIdx[i] = i;
+    }
+
+    //----------------------------------
+    // check geometry 
+    //----------------------------------
+
+    if (!checkGeometry(sx, sz, Nsource, rx, rz, Nrec, nx, nz, Nboudary)){
+        return 1;
     }
 
     //----------------------------------
