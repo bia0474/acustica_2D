@@ -46,13 +46,16 @@ int main(){
     int nz = int(L/dz) + 1; //number of spatial points in Z
     int nt = int(T/dt) + 1; //number of temporal steps
 
-    int interface_Z = nz/2;
+    int nx_abc = nx + 2 * Nboudary;
+    int nz_abc = nz + 2 * Nboudary; //expeding the model
+
+    int interface_Z = nz_abc/2;
 
     float *x = linspace(0.0, nx, nx);
     float *z = linspace(0.0, nz, nz);
     float *t = linspace(0.0, (nt - 1) * dt, nt);
 
-    int nrec = nx - 2 * Nboudary;
+    int nrec = nx_abc - 2 * Nboudary;
     int Nsource = 1;
 
     //----------------------------------
@@ -66,11 +69,10 @@ int main(){
         return 1;
     }
 
-    fprintf(file_parameters, "L = %.1f\n", L);
     fprintf(file_parameters, "T = %d\n", T);
 
-    fprintf(file_parameters, "nx = %d\n", nx);
-    fprintf(file_parameters, "nz = %d\n", nz);
+    fprintf(file_parameters, "nx_abc = %d\n", nx_abc);
+    fprintf(file_parameters, "nz_abc = %d\n", nz_abc);
     fprintf(file_parameters, "nt = %d\n", nt);
 
     fprintf(file_parameters, "dx = %.1f\n", dx);
