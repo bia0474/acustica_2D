@@ -105,8 +105,6 @@ plt.show()
 
 data = np.fromfile("/home/processamento/acustica_2D/outputs/seismogram.bin", dtype=np.float32)
 
-nt = data.size // nrec
-
 seismogram = data.reshape((nrec, nt), order="C")
 
 plt.figure(figsize=(10,8))
