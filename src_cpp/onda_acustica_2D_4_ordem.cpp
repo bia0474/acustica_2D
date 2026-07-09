@@ -5,6 +5,7 @@
 #include <string>
 #include <algorithm>
 #include <stdlib.h>
+#include <omp.h>
 
 //-------------------------------
 // Struct of the receivers
@@ -37,7 +38,7 @@ float* linspace(float start, int end, int quantity){//this function calculates t
 // read parameters function
 //----------------------------------
 
-void readParameters(const char *filename, int *T, int *nx_abc, int *nz_abc, int *nt, float *dx, float *dz, float *dt, float *f0, int *Nboudary, int *Nsource, int *nrec, char receivers_file[], char sources_file[], char velocity_file[], float **t){
+void readParameters(const char *filename, int *T, int *nx_abc, int *nz_abc, int *nt, float *dx, float *dz, float *dt, float *f0, int *Nboudary, int *Nsource, int *nrec, char receivers_file[], char sources_file[], char velocity_file[], float **x, float **z, float **t){
 
     FILE *file_parameters = fopen(filename, "r");
 
@@ -81,8 +82,10 @@ void readParameters(const char *filename, int *T, int *nx_abc, int *nz_abc, int 
 
     fclose(file_parameters);
 
-
+    *x = linspace(0.0f, *nx_abc, *nx_abc);
+    *z = linspace(0.0f, *nz_abc, *nz_abc);
     *t = linspace(0.0f, (*nt - 1) * (*dt), *nt);
+
 }
 
 //----------------------------------
@@ -245,11 +248,13 @@ float* AbsorbingBoudanry(int Nboudary, int nx_abc, int nz_abc, const float* A){ 
         return NULL; //null means it's not pointing anywhere
     }
 
+    #pragma omp parallel for
     for(int i = 0; i < nx_abc * nz_abc; i++){
 
         f[i] = 1.0f;
     }
 
+    #pragma omp parallel for collapse(2)
     for(int x = 0; x < Nboudary; x++){//Left
 
         for(int z = 0; z < nz_abc; z++){
@@ -268,6 +273,7 @@ float* AbsorbingBoudanry(int Nboudary, int nx_abc, int nz_abc, const float* A){ 
         }
     }   
 
+    #pragma omp parallel for collapse(2)
     for(int z = 0; z < Nboudary; z++){ //Top
 
         for(int x = 0; x < nx_abc; x++){
@@ -303,6 +309,7 @@ float* createCerjanVector(int Nboudary){ //generates the damping coefficients
         return NULL; //null means it's not pointing anywhere
     }
 
+    #pragma omp parallel for
     for(int i = 0; i < Nboudary; i++){
 
         float fb = (float) (Nboudary - i) / (1.4142f * Sb); //for each position of the absorbent layer, a normalized distance is calculated
@@ -323,6 +330,7 @@ float* source(float f0, const float* t, int nt){
 
     float t0 = 1.0 / f0; //wavelet time delay
 
+    #pragma omp parallel for
     for(int n = 0; n < nt; n++){
 
         float a = M_PI * M_PI * f0 * f0 * pow(t[n] - t0, 2);
@@ -343,6 +351,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     float *u_curr = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //present field
     float *u_next = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //future field
 
+    #pragma omp parallel for
     for(int i = 0; i < nx_abc * nz_abc; i++){ //inicialization
 
         u_old[i] = 0.0f;
@@ -356,6 +365,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
    float *e = (float*) malloc(nx_abc * nz_abc * sizeof(float));
 
+    #pragma omp parallel for collapse(2) schedule(static)
     for(int i = 0; i < nx_abc; i++){ 
 
         for(int j = 0; j < nz_abc; j++){
@@ -371,6 +381,12 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
     float *seismogram = (float*) malloc(nrec * nt * sizeof(float));
 
+    #pragma omp parallel for
+    for(int i = 0; i < nrec * nt; i++){ //inicialization
+
+        seismogram[i] = 0.0f;
+    }
+
 //----------------------------------
 // time loop - 2nd order
 //----------------------------------
@@ -383,6 +399,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         // space loop - 4nd order
         //----------------------------------
 
+        #pragma omp parallel for collapse(2) schedule(static)
         for(int j = 2; j < nx_abc - 2; j++){ //traverses all points of the grid in X
 
             for(int i = 2; i < nz_abc - 2; i++){ //traverses all points of the grid in Z
@@ -408,6 +425,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         // CERJAN
         //----------------------------------
         
+        #pragma omp parallel for collapse(2)
         for(int j = 0; j < nx_abc; j++){ //The amplitude of each field at each point gradually decreases
 
             for(int i = 0; i < nz_abc; i++){
@@ -421,6 +439,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         // save the receiver
         //----------------------------------
 
+        #pragma omp parallel for
         for(int i = 0; i < nrec; i++){
 
             int xr = receivers[i].x;
@@ -474,7 +493,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     //-----------------------------------
                 
     float *result = (float*) malloc(nx_abc * nz_abc *sizeof(float));
-
+    
     for(int i = 0; i < nx_abc * nz_abc; i++){
 
         result[i] = u_curr[i];
@@ -494,7 +513,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 //----------------------------------
 
 int main(){
-    
+
 //----------------------------------
 // open the document of PARAMETERS
 //----------------------------------
@@ -516,9 +535,11 @@ int main(){
     char sources_file[256];
     char velocity_file[256];
 
-    float *t;
+    float *x = NULL;
+    float *z = NULL;
+    float *t = NULL;
 
-    readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &t);
+    readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
 
 //----------------------------------
 // open the document of RECEIVERS
@@ -577,11 +598,15 @@ int main(){
     free(f);
     free(A);
     free(fonte);
-    free(receivers);
+    free(c);
     free(sx);
     free(sz);
+    free(x);
+    free(z);
     free(t);
+    free(receivers);
 
     return 0;
 
 }
+
