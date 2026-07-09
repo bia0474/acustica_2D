@@ -436,6 +436,8 @@ int main(){
 // open the document of the SOURCE
 //-----------------------------------------
 
+//construir funções para deixar o main como controlador
+
     int *sx = (int*) malloc(Nsource * sizeof(int));
     int *sz = (int*) malloc(Nsource * sizeof(int));
 

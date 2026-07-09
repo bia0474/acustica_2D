@@ -7,15 +7,28 @@ import matplotlib.animation as animation
 # PARAMETERS
 #----------------------------------
 
-L = 5000
-dx = 10
-dz = 10
-T = 2.0 #total simulation time
+L = T = dx = dz = dt = nrec = None
 
-nx = 381
-nz = 381
+with open("/home/processamento/acustica_2D/inputs/parameters.txt", "r") as file:
+    for linha in file:
+        if linha.startswith("L ="):
+            L = float(linha.split("=")[1])
+        elif linha.startswith("T ="):
+            T = int(linha.split("=")[1])
+        elif linha.startswith("dx ="):
+            dx = float(linha.split("=")[1])
+        elif linha.startswith("dz ="):
+            dz = float(linha.split("=")[1])
+        elif linha.startswith("dt ="):
+            dt = float(linha.split("=")[1])
+        elif linha.startswith("nrec ="):
+            nrec = int(linha.split("=")[1])
 
-nrec = 381
+nx_complete_model = 501
+nz_complete_model = 501
+nx_snap = 381
+nz_snap = 381
+nt = int(T/dt) + 1
 
 #----------------------------------
 # plot one snap of the simulation
@@ -23,11 +36,11 @@ nrec = 381
 
 data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
 
-wavefield = data.reshape((nx, nz))
+wavefield = data.reshape((nx_snap, nz_snap))
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto")
+plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx_snap*dx, nz_snap*dz, 0], aspect="auto")
 
 plt.colorbar(label="Amplitude")
 
@@ -45,9 +58,9 @@ plt.show()
 fig, ax = plt.subplots(figsize=(8,6))
 
 first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
-first = first.reshape((nx, nz))
+first = first.reshape((nx_snap, nz_snap))
 
-img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto", animated=True)
+img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx_snap*dx, nz_snap*dz, 0], aspect="auto", animated=True)
 
 plt.colorbar(img)
 
@@ -60,7 +73,7 @@ def update(frame):
 
     data = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_{frame}.bin", dtype=np.float32)
 
-    wavefield = data.reshape((nx, nz))
+    wavefield = data.reshape((nx_snap, nz_snap))
 
     img.set_array(wavefield.T)
 
@@ -75,9 +88,6 @@ plt.show()
 #----------------------------------
 # velocity model
 #----------------------------------
-
-nx_complete_model = 501
-nz_complete_model = 501
 
 vel = np.loadtxt("/home/processamento/acustica_2D/inputs/velocityModel.csv", delimiter=",", skiprows=1)
 
