@@ -15,56 +15,274 @@
         int z;
     } Receiver;
 
+//----------------------------------
+// linscpace function
+//----------------------------------
+
+float* linspace(float start, int end, int quantity){//this function calculates the step between the points and fills the vector accordingly
+
+    float *number = (float*) malloc(quantity * sizeof(float));
+
+    float dx = (end - start) / (quantity - 1);
+
+    for(int i = 0; i < quantity; i++){
+
+        number[i] = start + i * dx;
+    }
+
+    return number;
+}
+
+//----------------------------------
+// read parameters function
+//----------------------------------
+
+void readParameters(const char *filename, int *T, int *nx_abc, int *nz_abc, int *nt, float *dx, float *dz, float *dt, float *f0, int *Nboudary, int *Nsource, int *nrec, char receivers_file[], char sources_file[], char velocity_file[], float **t){
+
+    FILE *file_parameters = fopen(filename, "r");
+
+    if(file_parameters == NULL){
+        printf("Erro ao abrir arquivo de parametros\n");
+        exit(1);
+    }
+    
+    char linha[256];
+
+    while(fgets(linha, sizeof(linha), file_parameters)){
+
+        if(sscanf(linha, "T = %d", T) == 1) continue;
+
+        if(sscanf(linha, "nx_abc = %d", nx_abc) == 1) continue;
+
+        if(sscanf(linha, "nz_abc = %d", nz_abc) == 1) continue;
+
+        if(sscanf(linha, "nt = %d", nt) == 1) continue;
+
+        if(sscanf(linha, "dx = %f", dx) == 1) continue;
+
+        if(sscanf(linha, "dz = %f", dz) == 1) continue;
+
+        if(sscanf(linha, "dt = %f", dt) == 1) continue;
+
+        if(sscanf(linha, "f0 = %f", f0) == 1) continue;
+
+        if(sscanf(linha, "Nboudary = %d", Nboudary) == 1) continue;
+
+        if(sscanf(linha, "nrec = %d", nrec) == 1) continue;
+
+        if(sscanf(linha, "Nsource = %d", Nsource) == 1) continue;
+
+        if(sscanf(linha, "receivers_file = %255s", receivers_file) == 1) continue;
+
+        if(sscanf(linha, "sources_file = %255s", sources_file) == 1) continue;
+
+        if(sscanf(linha, "velocity_file = %255s", velocity_file) == 1) continue;
+    }
+
+    fclose(file_parameters);
+
+
+    *t = linspace(0.0f, (*nt - 1) * (*dt), *nt);
+}
+
+//----------------------------------
+// read receivers function
+//----------------------------------
+
+Receiver* readReceivers(const char *receivers_file, int nrec){
+
+    Receiver *receivers = (Receiver*) malloc(nrec * sizeof(Receiver));
+
+    if(receivers == NULL){
+        std::cout << "Erro ao alocar memoria para os receptores.\n";
+        exit(1);
+    }
+
+    std::ifstream file(receivers_file);
+
+    if(!file.is_open()){
+        std::cout << "Erro ao abrir receivers.csv\n";
+        free(receivers);
+        exit(1);
+    }
+
+    std::string linha;
+
+    std::getline(file, linha);
+
+    int i = 0;
+
+    while(std::getline(file, linha) && i < nrec){
+
+        std::stringstream ss(linha);
+
+        std::string index, rx, rz;
+
+        std::getline(ss, index, ',');
+        std::getline(ss, rx, ',');
+        std::getline(ss, rz, ',');
+
+        receivers[i].x = std::stoi(rx);
+        receivers[i].z = std::stoi(rz);
+
+        i++;
+    }
+
+    file.close();
+
+    return receivers;
+}
+
+//----------------------------------
+// read sources function
+//----------------------------------
+
+void readSources(const char *sources_file, int Nsource, int **sx, int **sz){
+
+    *sx = (int*) malloc(Nsource * sizeof(int));
+    *sz = (int*) malloc(Nsource * sizeof(int));
+
+    if(*sx == NULL || *sz == NULL){
+        std::cout << "Erro ao alocar memoria para as fontes.\n";
+        exit(1);
+    }
+
+    std::ifstream file(sources_file);
+
+    if(!file.is_open()){
+        std::cout << "Erro ao abrir sources.csv\n";
+        free(*sx);
+        free(*sz);
+        exit(1);
+    }
+
+    std::string linha;
+
+    std::getline(file, linha);
+
+    int i = 0;
+
+    while(std::getline(file, linha) && i < Nsource){
+
+        std::stringstream ss(linha);
+
+        std::string index_str;
+        std::string sx_str;
+        std::string sz_str;
+
+        std::getline(ss, index_str, ',');
+        std::getline(ss, sx_str, ',');
+        std::getline(ss, sz_str, ',');
+
+        (*sx)[i] = std::stoi(sx_str);
+        (*sz)[i] = std::stoi(sz_str);
+
+        i++;
+    }
+
+    file.close();
+}
+
+//----------------------------------
+// read velocity model function
+//----------------------------------
+
+float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
+
+    float *c = (float*) malloc(nx_abc * nz_abc * sizeof(float));
+
+    if(c == NULL){
+        std::cout << "Erro ao alocar memoria para o modelo de velocidade.\n";
+        exit(1);
+    }
+
+    std::ifstream file(velocity_file);
+
+    if(!file.is_open()){
+        std::cout << "Erro ao abrir velocityModel.csv\n";
+        free(c);
+        exit(1);
+    }
+
+    std::string linha;
+
+    std::getline(file, linha);
+
+    int i = 0;
+
+    while(std::getline(file, linha) && i < nx_abc){
+
+        std::stringstream ss(linha);
+
+        std::string velocity;
+
+        int j = 0;
+
+        while(std::getline(ss, velocity, ',') && j < nz_abc){
+
+            c[i * nz_abc + j] = std::stof(velocity);
+
+            j++;
+        }
+
+        i++;
+    }
+
+    file.close();
+
+    return c;
+}
+
 //-------------------------------
 // Cerjan - absorving boudanry
 //-------------------------------
 
-float* AbsorbingBoudanry(int Nboudary, int nx, int nz, const float* A){ //it returns a vector f that will be injected into future and present fields to decrease the energy and consequently the amplitude of the wave
+float* AbsorbingBoudanry(int Nboudary, int nx_abc, int nz_abc, const float* A){ //it returns a vector f that will be injected into future and present fields to decrease the energy and consequently the amplitude of the wave
     
-    float *f = (float*) malloc(nx * nz * sizeof(float)); //matriz of size nx with all values equal to 1 (f(x) = 1 -> withuot cushioning)
+    float *f = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //matriz of size nx with all values equal to 1 (f(x) = 1 -> withuot cushioning)
 
     if(f == NULL){ //checks if memory has been allocated
         return NULL; //null means it's not pointing anywhere
     }
 
-    for(int i = 0; i < nx * nz; i++){
+    for(int i = 0; i < nx_abc * nz_abc; i++){
 
         f[i] = 1.0f;
     }
 
     for(int x = 0; x < Nboudary; x++){//Left
 
-        for(int z = 0; z < nz; z++){
+        for(int z = 0; z < nz_abc; z++){
 
-            f[x * nz + z] *= A[x];
+            f[x * nz_abc + z] *= A[x];
         }
     }
 
-    for(int x = nx - Nboudary; x < nx; x++){//right
+    for(int x = nx_abc - Nboudary; x < nx_abc; x++){//right
 
-        int k = nx - 1 - x;
+        int k = nx_abc - 1 - x;
 
-        for(int z = 0; z < nz; z++){
+        for(int z = 0; z < nz_abc; z++){
 
-            f[x * nz + z] *= A[k];
+            f[x * nz_abc + z] *= A[k];
         }
     }   
 
     for(int z = 0; z < Nboudary; z++){ //Top
 
-        for(int x = 0; x < nx; x++){
+        for(int x = 0; x < nx_abc; x++){
 
-            f[x * nz + z] *= A[z];
+            f[x * nz_abc + z] *= A[z];
         }
     }
 
-    for(int z = nz - Nboudary; z < nz; z++){
+    for(int z = nz_abc - Nboudary; z < nz_abc; z++){
 
-        int k = nz - 1 - z;
+        int k = nz_abc - 1 - z;
 
-        for(int x = 0; x < nx; x++){ //Base
+        for(int x = 0; x < nx_abc; x++){ //Base
 
-            f[x * nz + z] *= A[k];
+            f[x * nz_abc + z] *= A[k];
         }
     }
 
@@ -96,24 +314,6 @@ float* createCerjanVector(int Nboudary){ //generates the damping coefficients
 }
 
 //----------------------------------
-// linscpace function
-//----------------------------------
-
-float* linspace(float start, int end, int quantity){//this function calculates the step between the points and fills the vector accordingly
-
-    float *number = (float*) malloc(quantity * sizeof(float));
-
-    float dx = (end - start) / (quantity - 1);
-
-    for(int i = 0; i < quantity; i++){
-
-        number[i] = start + i * dx;
-    }
-
-    return number;
-}
-
-//----------------------------------
 // Ricker source
 //----------------------------------
 
@@ -137,13 +337,13 @@ float* source(float f0, const float* t, int nt){
 // Wave equation
 //----------------------------------
 
-float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nt, const float* f, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
+float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx_abc, int nz_abc, int nt, const float* f, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
 
-    float *u_old = (float*) malloc(nx * nz * sizeof(float)); //passed field
-    float *u_curr = (float*) malloc(nx * nz * sizeof(float)); //present field
-    float *u_next = (float*) malloc(nx * nz * sizeof(float)); //future field
+    float *u_old = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //passed field
+    float *u_curr = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //present field
+    float *u_next = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //future field
 
-    for(int i = 0; i < nx * nz; i++){ //inicialization
+    for(int i = 0; i < nx_abc * nz_abc; i++){ //inicialization
 
         u_old[i] = 0.0f;
         u_curr[i] = 0.0f;
@@ -154,13 +354,13 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 // Courant number for speeds
 //----------------------------------
 
-   float *e = (float*) malloc(nx * nz * sizeof(float));
+   float *e = (float*) malloc(nx_abc * nz_abc * sizeof(float));
 
-    for(int i = 0; i < nx; i++){ 
+    for(int i = 0; i < nx_abc; i++){ 
 
-        for(int j = 0; j < nz; j++){
+        for(int j = 0; j < nz_abc; j++){
 
-            e[i * nz + j] = c[i * nz + j] * dt / dx; //because dx == dz !!
+            e[i * nz_abc + j] = c[i * nz_abc + j] * dt / dx; //because dx == dz !!
         }
     }
 
@@ -177,21 +377,21 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
     for(int n = 1; n < nt; n++){ //each iteration calculates the wave at the next instant
 
-        std::fill(u_next, u_next + nx * nz, 0.0f); //resets the futures field before the next calculation
+        std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f); //resets the futures field before the next calculation
 
         //----------------------------------
         // space loop - 4nd order
         //----------------------------------
 
-        for(int j = 2; j < nx - 2; j++){ //traverses all points of the grid in X
+        for(int j = 2; j < nx_abc - 2; j++){ //traverses all points of the grid in X
 
-            for(int i = 2; i < nz - 2; i++){ //traverses all points of the grid in Z
+            for(int i = 2; i < nz_abc - 2; i++){ //traverses all points of the grid in Z
 
-                float d2x = (-u_curr[(j + 2) * nz + i] + 16 * u_curr[(j + 1) * nz + i] - 30 * u_curr[j * nz + i] + 16 * u_curr[(j - 1) * nz + i] -u_curr[(j - 2) * nz + i])/(12 * dx * dx);
+                float d2x = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] -u_curr[(j - 2) * nz_abc + i])/(12 * dx * dx);
 
-                float d2z = (-u_curr[j * nz + (i + 2)] + 16 * u_curr[j * nz + (i + 1)] - 30 * u_curr[j * nz + i] + 16 * u_curr[j * nz + (i-1)] - u_curr[j * nz + (i - 2)])/(12 * dz * dz);
+                float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i-1)] - u_curr[j * nz_abc + (i - 2)])/(12 * dz * dz);
 
-                u_next[j * nz + i] = 2 * u_curr[j * nz + i] - u_old[j * nz + i] + c[j * nz + i] * c[j * nz + i] * dt * dt * (d2x + d2z);
+                u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_old[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
             }
         }
 
@@ -201,19 +401,19 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
         for(int k = 0; k < Nsource; k++){
             //adds energy to the grid
-            u_next[sx[k] * nz + sz[k]] += fonte[n]; 
+            u_next[sx[k] * nz_abc + sz[k]] += fonte[n]; 
         }
       
         //----------------------------------
         // CERJAN
         //----------------------------------
         
-        for(int j = 0; j < nx; j++){ //The amplitude of each field at each point gradually decreases
+        for(int j = 0; j < nx_abc; j++){ //The amplitude of each field at each point gradually decreases
 
-            for(int i = 0; i < nz; i++){
+            for(int i = 0; i < nz_abc; i++){
 
-                u_next[j * nz + i] *= f[j * nz + i];
-                u_curr[j * nz + i] *= f[j * nz + i];
+                u_next[j * nz_abc + i] *= f[j * nz_abc + i];
+                u_curr[j * nz_abc + i] *= f[j * nz_abc + i];
             }
         }
         
@@ -226,7 +426,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
             int xr = receivers[i].x;
             int zr = receivers[i].z;
 
-            seismogram[i * nt + n] = u_next[xr * nz + zr];
+            seismogram[i * nt + n] = u_next[xr * nz_abc + zr];
 
         }
 
@@ -238,9 +438,9 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
             std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
 
-            for(int x = Nboudary; x < nx - Nboudary; x++){
+            for(int x = Nboudary; x < nx_abc - Nboudary; x++){
 
-                file.write(reinterpret_cast<char*>(&u_next[x * nz + Nboudary]), (nz - 2 * Nboudary) * sizeof(float)); //saves snaps without the absorbent border
+                file.write(reinterpret_cast<char*>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves snaps without the absorbent border
 
             }
 
@@ -273,9 +473,9 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     // SAVE the copy of the final field
     //-----------------------------------
                 
-    float *result = (float*) malloc(nx * nz *sizeof(float));
+    float *result = (float*) malloc(nx_abc * nz_abc *sizeof(float));
 
-    for(int i = 0; i < nx * nz; i++){
+    for(int i = 0; i < nx_abc * nz_abc; i++){
 
         result[i] = u_curr[i];
     }
@@ -299,190 +499,68 @@ int main(){
 // open the document of PARAMETERS
 //----------------------------------
 
-    FILE *file_parameters = fopen("/home/processamento/acustica_2D/inputs/parameters.txt", "r");
+    int T;
+    int nx_abc;
+    int nz_abc;
+    int nt;
+    int Nboudary;
+    int Nsource;
+    int nrec;
 
-    if(file_parameters == NULL){
-        printf("Erro ao abrir arquivo de parametros\n");
-        return 1;
-    }
-    
+    float dx;
+    float dz;
+    float dt;
+    float f0;
+
     char receivers_file[256];
     char sources_file[256];
     char velocity_file[256];
-    char linha[256];
 
-    float L = 0.0f;
-    float dx = 0.0f;
-    float dz = 0.0f;
-    float dt = 0.0f;
-    float f0 = 0.0f;
+    float *t;
 
-    int T = 0;
-    int Nboudary = 0;
-    int Nsource = 0;
-    int nrec = 0;
-
-    while(fgets(linha, sizeof(linha), file_parameters)){
-
-        if(sscanf(linha, "L = %f", &L) == 1) continue;
-
-        if(sscanf(linha, "T = %d", &T) == 1) continue;
-
-        if(sscanf(linha, "dx = %f", &dx) == 1) continue;
-
-        if(sscanf(linha, "dz = %f", &dz) == 1) continue;
-
-        if(sscanf(linha, "dt = %f", &dt) == 1) continue;
-
-        if(sscanf(linha, "f0 = %f", &f0) == 1) continue;
-
-        if(sscanf(linha, "Nboudary = %d", &Nboudary) == 1) continue;
-
-        if(sscanf(linha, "nrec = %d", &nrec) == 1) continue;
-
-        if(sscanf(linha, "Nsource = %d", &Nsource) == 1) continue;
-
-        if(sscanf(linha, "receivers_file = %255s", receivers_file) == 1) continue;
-
-        if(sscanf(linha, "sources_file = %255s", sources_file) == 1) continue;
-
-        if(sscanf(linha, "velocity_file = %255s", velocity_file) == 1) continue;
-    }
-
-    fclose(file_parameters);
-
-    int nx = int(L/dx) + 1; //number of spatial points in X
-    int nz = int(L/dz) + 1; //number of spatial points in Z
-    int nt = int(T/dt) + 1; //number of temporal steps
-    
-    float *x = linspace(0.0, nx, nx);
-    float *z = linspace(0.0, nz, nz);
-    float *t = linspace(0.0, (nt - 1) * dt, nt);
+    readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &t);
 
 //----------------------------------
 // open the document of RECEIVERS
 //----------------------------------
 
-    Receiver *receivers = (Receiver*) malloc(nrec * sizeof(Receiver));
+    Receiver *receivers = readReceivers(receivers_file, nrec);
 
-    std::ifstream file_receivers(receivers_file);
-
-    if(!file_receivers.is_open()){
-        std::cout << "Erro ao abrir receivers.csv\n";
-        return 1;
-    }
-
-    std::string linha1;
-
-    std::getline(file_receivers, linha1);
-
-    int i = 0;
-
-    while(std::getline(file_receivers, linha1)){
-
-        std::stringstream ss(linha1);
-
-        std::string index, rx, rz;
-
-        std::getline(ss, index, ',');
-        std::getline(ss, rx, ',');
-        std::getline(ss, rz, ',');
-
-        receivers[i].x = std::stoi(rx);
-        receivers[i].z = std::stoi(rz);
-        
-        i++;
-    }
-
-//------------------------------------------
+//-----------------------------------------
 // open the document of the VELOCITY MODEL
 //-----------------------------------------
 
-    float *c = (float*) malloc(nx * nz * sizeof(float));
-
-    std::ifstream file_velocity(velocity_file);
-
-    if(!file_velocity.is_open()){
-        std::cout << "Erro ao abrir velocityModel.csv\n";
-        return 1;
-    }
-
-    std::string linha2;
-
-    std::getline(file_velocity, linha2);
-
-    int j = 0;
-
-    while(std::getline(file_velocity, linha2)){
-
-        std::stringstream ss(linha2);
-
-        std::string velocity;
-
-        int k = 0;
-
-        while(std::getline(ss, velocity, ',')){
-
-            c[j * nz + k] = std::stof(velocity);
-
-            k++;
-        }
-        j++;
-    }
-
-    float *fonte = source(f0, t, nt); 
+    float *c = readVelocity(velocity_file, nx_abc, nz_abc);
 
 //------------------------------------------
 // open the document of the SOURCE
 //-----------------------------------------
 
-    int *sx = (int*) malloc(Nsource * sizeof(int));
-    int *sz = (int*) malloc(Nsource * sizeof(int));
+    int *sx = NULL;
+    int *sz = NULL;
 
-    std::ifstream file_source(sources_file);
+    readSources(sources_file, Nsource, &sx, &sz);
 
-    if(!file_source.is_open()){
-        std::cout << "Erro ao abrir sources.csv\n";
-        return 1;
-    }
+//-----------------------------------------
+// call the source fuction
+//-----------------------------------------
 
-    std::string linha3;
+    float *fonte = source(f0, t, nt); 
 
-    std::getline(file_source, linha3);
-
-    int h = 0;
-
-    while(std::getline(file_source, linha3)){
-
-        std::stringstream ss(linha3);
-
-        std::string index_str;
-        std::string sx_str; 
-        std::string sz_str;
-
-        std::getline(ss, index_str, ',');
-        std::getline(ss, sx_str, ',');
-        std::getline(ss, sz_str, ',');
-
-        sx[h] = std::stoi(sx_str);
-        sz[h] = std::stoi(sz_str);
-
-        h++;
-    }
 
 //------------------------------------
 //  CERJAN
 //------------------------------------
 
-float *A = createCerjanVector(Nboudary);
+    float *A = createCerjanVector(Nboudary);
 
-float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
+    float *f = AbsorbingBoudanry(Nboudary, nx_abc, nz_abc, A);
 
 //----------------------------------
 // wavefield
 //----------------------------------
 
-    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nt, f, Nboudary, sx, sz, Nsource, receivers, nrec); 
+    float *wavefield = derivates(c, dt, dx, dz, fonte, nx_abc, nz_abc, nt, f, Nboudary, sx, sz, Nsource, receivers, nrec); 
 
 //---------------------------------------
 // Save binary document of the simulation
@@ -490,7 +568,7 @@ float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
 
     std::ofstream file("/home/processamento/acustica_2D/outputs/wave.bin", std::ios::binary);
 
-    file.write(reinterpret_cast<char*>(wavefield), nx * nz * sizeof(float)); 
+    file.write(reinterpret_cast<char*>(wavefield), nx_abc * nz_abc * sizeof(float)); 
 
     file.close();
 
@@ -500,13 +578,10 @@ float *f = AbsorbingBoudanry(Nboudary, nx, nz, A);
     free(f);
     free(A);
     free(fonte);
-    free(c);
-    free(x);
-    free(z);
-    free(t);
     free(receivers);
     free(sx);
     free(sz);
+    free(t);
 
     return 0;
 

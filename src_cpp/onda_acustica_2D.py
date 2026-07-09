@@ -7,15 +7,16 @@ import matplotlib.animation as animation
 # PARAMETERS
 #----------------------------------
 
-L = 5000
 dx = 10
 dz = 10
 T = 2.0 #total simulation time
 
-nx = 381
-nz = 381
+nx_abc = 621
+nz_abc = 621
 
-nrec = 381
+Nboudary = 60
+
+nrec = 501
 
 #----------------------------------
 # plot one snap of the simulation
@@ -23,11 +24,11 @@ nrec = 381
 
 data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
 
-wavefield = data.reshape((nx, nz))
+wavefield = data.reshape((nx_abc - 2 * Nboudary, nz_abc - 2 * Nboudary))
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto")
+plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, (nx_abc - 2 * Nboudary)*dx, (nz_abc - 2 * Nboudary)*dz, 0], aspect="auto")
 
 plt.colorbar(label="Amplitude")
 
@@ -45,9 +46,9 @@ plt.show()
 fig, ax = plt.subplots(figsize=(8,6))
 
 first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
-first = first.reshape((nx, nz))
+first = first.reshape((nx_abc - 2 * Nboudary, nz_abc - 2 * Nboudary))
 
-img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto", animated=True)
+img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, (nx_abc - 2 * Nboudary)*dx, (nz_abc - 2 * Nboudary)*dz, 0], aspect="auto", animated=True)
 
 plt.colorbar(img)
 
@@ -60,7 +61,7 @@ def update(frame):
 
     data = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_{frame}.bin", dtype=np.float32)
 
-    wavefield = data.reshape((nx, nz))
+    wavefield = data.reshape((nx_abc - 2 * Nboudary, nz_abc - 2 * Nboudary))
 
     img.set_array(wavefield.T)
 
@@ -76,16 +77,13 @@ plt.show()
 # velocity model
 #----------------------------------
 
-nx_complete_model = 501
-nz_complete_model = 501
-
 vel = np.loadtxt("/home/processamento/acustica_2D/inputs/velocityModel.csv", delimiter=",", skiprows=1)
 
-vel = vel.reshape((nx_complete_model, nz_complete_model))
+vel = vel.reshape((nx_abc, nz_abc))
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(vel.T, origin="upper", extent=[0, nx_complete_model*dx, nz_complete_model*dz, 0], aspect="auto")
+plt.imshow(vel.T, origin="upper", extent=[0, nx_abc*dx, nz_abc*dz, 0], aspect="auto")
 
 plt.colorbar(label="Velocity (m/s)")
 

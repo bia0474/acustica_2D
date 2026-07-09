@@ -6,11 +6,11 @@
 // check geometry function
 //----------------------------------
 
-bool checkGeometry(const int *sx, const int *sz, int Nsource, const int *rx, const int *rz, int Nrec, int nx, int nz, int Nboudary){
+bool checkGeometry(const int *sx, const int *sz, int Nsource, const int *rx, const int *rz, int Nrec, int nx_abc, int nz_abc, int Nboudary){
 
     for(int i = 0; i < Nsource; i++){
         
-        if(sx[i] < Nboudary || sx[i] >= nx - Nboudary || sz[i] < Nboudary || sz[i] >= nz - Nboudary){
+        if(sx[i] < Nboudary || sx[i] >= nx_abc - Nboudary || sz[i] < Nboudary || sz[i] >= nz_abc - Nboudary){
             
             std::cout << "Erro: Fonte " << i << " esta dentro da borda de absorcao.\n";
             return false;
@@ -19,7 +19,7 @@ bool checkGeometry(const int *sx, const int *sz, int Nsource, const int *rx, con
 
     for(int j = 0; j < Nrec; j++){
 
-        if(rx[j] < Nboudary || rx[j] >= nx - Nboudary || rz[j] < Nboudary || rz[j] >= nz - Nboudary){
+        if(rx[j] < Nboudary || rx[j] >= nx_abc - Nboudary || rz[j] < Nboudary || rz[j] >= nz_abc - Nboudary){
 
             std::cout << "Erro: Receptor " << j << " esta dentro da borda de absorcao.\n";
             return false;
@@ -76,8 +76,8 @@ int main(){
 
     int Nrec = 0;
     int Nsource = 0;
-    int nx = 0;
-    int nz = 0;
+    int nx_abc = 0;
+    int nz_abc = 0;
     int Nboudary = 0;
 
     while(fgets(linha, sizeof(linha), file)){
@@ -90,11 +90,11 @@ int main(){
             continue;
         }
 
-        if(sscanf(linha, "nx = %d", &nx) == 1){
+        if(sscanf(linha, "nx_abc = %d", &nx_abc) == 1){
             continue;
         }
 
-        if(sscanf(linha, "nz = %d", &nz) == 1){
+        if(sscanf(linha, "nz_abc = %d", &nz_abc) == 1){
             continue;
         }
 
@@ -110,7 +110,7 @@ int main(){
     //-------------------------------
 
     int sx_init = 0;
-    int sx_end = 250;
+    int sx_end = 310;
 
     int *sx = linspace(sx_init, sx_end, Nsource, 0);
 
@@ -118,7 +118,7 @@ int main(){
 
     for(int i = 0; i < Nsource; i++){
 
-        sz[i] = 100.0f;
+        sz[i] = 40.0f + Nboudary;
     }
 
     if(sz == NULL){
@@ -142,8 +142,8 @@ int main(){
     // RECEIVERS
     //----------------------------------
 
-    int rx_init = 60;
-    int rx_end = 440;
+    int rx_init = Nboudary;
+    int rx_end = nx_abc - Nboudary - 1;
 
     int *rx = linspace(rx_init, rx_end, Nrec, 1);
 
@@ -156,7 +156,7 @@ int main(){
 
     for(int i = 0; i < Nrec; i++){
 
-        rz[i] = 60.0f;
+        rz[i] = 60.0f + Nboudary;
     }
 
     int *rIdx = (int*) malloc(Nrec * sizeof(int));
@@ -175,7 +175,7 @@ int main(){
     // check geometry 
     //----------------------------------
 
-    if (!checkGeometry(sx, sz, Nsource, rx, rz, Nrec, nx, nz, Nboudary)){
+    if (!checkGeometry(sx, sz, Nsource, rx, rz, Nrec, nx_abc, nz_abc, Nboudary)){
         return 1;
     }
 

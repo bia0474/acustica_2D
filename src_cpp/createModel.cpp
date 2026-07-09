@@ -8,19 +8,19 @@
 // media speeds
 //-------------------------------
 
-float* velocity(int nx, int nz, float c1, float c2, int interface_Z){
+float* velocity(int nx_abc, int nz_abc, float c1, float c2, int interface_Z){
 
-    float *velocity = (float*) malloc(nx * nz * sizeof(float));
+    float *velocity = (float*) malloc(nx_abc * nz_abc * sizeof(float));
 
-    for(int i = 0; i < nx; i++){
+    for(int i = 0; i < nx_abc; i++){
 
-        for(int j = 0; j < nz; j++){
+        for(int j = 0; j < nz_abc; j++){
 
             if(j < interface_Z){
-                velocity[i * nz + j] = c1;
+                velocity[i * nz_abc + j] = c1;
             }
             else{
-                velocity[i * nz + j] = c2;
+                velocity[i * nz_abc + j] = c2;
             }
         }
     }
@@ -33,15 +33,15 @@ float* velocity(int nx, int nz, float c1, float c2, int interface_Z){
 //----------------------------------
 
 
-bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //function of the stability codition
+bool CFL(const float* c, float dt, float dx, float dz, int nx_abc, int nz_abc){ //function of the stability codition
 
     float cmax = 0.0f;
 
-    for(int i = 0; i < nx; i++){
+    for(int i = 0; i < nx_abc; i++){
 
-        for(int j = 0; j < nz; j++){
+        for(int j = 0; j < nz_abc; j++){
 
-            cmax = std::max(cmax, c[i * nz + j]);
+            cmax = std::max(cmax, c[i * nz_abc + j]);
         }
     }
 
@@ -70,17 +70,21 @@ int main(){
 
     char linha[256];
 
-    float L = 0.0f;
     float dx = 0.0f;
     float dz = 0.0f;
     float dt = 0.0f;
     float c1 = 0.0f;
     float c2 = 0.0f;
+
+    int nx_abc = 0;
+    int nz_abc = 0;
     int interface_Z = 0;
+
 
     while(fgets(linha, sizeof(linha), file_parameters)){
 
-        sscanf(linha, "L = %f", &L);
+        sscanf(linha, "nx_abc = %d", &nx_abc);
+        sscanf(linha, "nz_abc = %d", &nz_abc);
         sscanf(linha, "dx = %f", &dx);
         sscanf(linha, "dz = %f", &dz);
         sscanf(linha, "dt = %f", &dt);
@@ -93,16 +97,13 @@ int main(){
 
     fclose(file_parameters);
 
-    int nx = (int)(L/dx) + 1;
-    int nz = (int)(L/dz) + 1;
-
-    float *c = velocity(nx, nz, c1, c2, interface_Z);
+    float *c = velocity(nx_abc, nz_abc, c1, c2, interface_Z);
 
 //----------------------------------
 // CFL check
 //----------------------------------
 
-    if(CFL(c, dt, dx, dz, nx, nz)){
+    if(CFL(c, dt, dx, dz, nx_abc, nz_abc)){
 
         std::cout << "Stable simulation" << std::endl;
     }
@@ -124,12 +125,12 @@ int main(){
 
     fprintf(file_velocities, "c\n"); //writing the header
 
-    for(int i = 0; i < nx; i++){
-        for(int j = 0; j < nz; j++){
+    for(int i = 0; i < nx_abc; i++){
+        for(int j = 0; j < nz_abc; j++){
             
-            fprintf(file_velocities, "%.1f", c[i * nz + j]);
+            fprintf(file_velocities, "%.1f", c[i * nz_abc + j]);
 
-            if(j < nz - 1){
+            if(j < nz_abc - 1){
                 fprintf(file_velocities, ",");
             }
         }
