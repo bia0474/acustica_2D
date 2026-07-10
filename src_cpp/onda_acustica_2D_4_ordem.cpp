@@ -192,6 +192,38 @@ void readSources(const char *sources_file, int Nsource, int **sx, int **sz){
 
 float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
 
+    FILE *file = fopen(velocity_file, "rb");
+
+    if(file == NULL){
+        printf("Erro ao abrir o arquivo do modelo de velocidade.\n");
+        exit(1);
+    }
+
+    float *c = (float*) malloc(nx_abc * nz_abc * sizeof(float));
+
+    if(c == NULL){
+        printf("Erro ao alocar memória para c.\n");
+        fclose(file);
+        exit(1);
+    }
+
+    size_t n = fread(c, sizeof(float), nx_abc * nz_abc, file);
+
+    if(n != (size_t)(nx_abc * nz_abc)){
+        printf("Erro na leitura do modelo de velocidade.\n");
+        free(c);
+        fclose(file);
+        exit(1);
+    }
+
+    fclose(file);
+
+    return c;
+}
+
+/* 
+float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
+
     float *c = (float*) malloc(nx_abc * nz_abc * sizeof(float));
 
     if(c == NULL){
@@ -202,7 +234,7 @@ float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
     std::ifstream file(velocity_file);
 
     if(!file.is_open()){
-        std::cout << "Erro ao abrir velocityModel.csv\n";
+        std::cout << "Erro ao abrir o arquivo do modelo\n";
         free(c);
         exit(1);
     }
@@ -235,6 +267,8 @@ float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
 
     return c;
 }
+*/
+
 
 //-------------------------------
 // Cerjan - absorving boudanry
@@ -551,7 +585,7 @@ int main(){
 // open the document of the VELOCITY MODEL
 //-----------------------------------------
 
-    float *c = readVelocity(velocity_file, nx_abc, nz_abc);
+    float *c = readVelocity("/home/processamento/acustica_2D/src_cpp/Vp_camadas_621x621.bin", nx_abc, nz_abc);
 
 //------------------------------------------
 // open the document of the SOURCE

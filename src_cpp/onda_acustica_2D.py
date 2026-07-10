@@ -84,6 +84,24 @@ plt.show()
 # velocity model
 #----------------------------------
 
+vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/Vp_camadas_621x621.bin", dtype=np.float32)
+
+vel = vel.reshape((nx_abc, nz_abc))
+
+plt.figure(figsize=(8,6))
+
+plt.imshow(vel, origin="upper", extent=[0, (nx_abc - 2 * Nboudary) * dx, (nz_abc - 2 * Nboudary) * dz, 0], aspect="auto")
+
+plt.colorbar(label="Velocity (m/s)")
+
+plt.xlabel("x (m)")
+plt.ylabel("z (m)")
+
+plt.title("Velocity Model")
+
+plt.show()
+
+'''
 vel = np.loadtxt("/home/processamento/acustica_2D/inputs/velocityModel.csv", delimiter=",", skiprows=1)
 
 plt.figure(figsize=(8,6))
@@ -98,7 +116,7 @@ plt.ylabel("z (m)")
 plt.title("Velocity Model")
 
 plt.show()
-
+'''
 #----------------------------------
 # Plot the sismogram
 #----------------------------------
@@ -109,7 +127,7 @@ seismogram = data.reshape((nrec, nt), order="C")
 
 plt.figure(figsize=(10,8))
 
-vmax = np.percentile(np.abs(seismogram), 80)
+vmax = np.percentile(np.abs(seismogram), 99)
 
 plt.imshow(seismogram.T, cmap="gray", aspect="auto", vmin=-vmax, vmax=vmax)
 
