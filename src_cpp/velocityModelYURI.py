@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-nz = 621
-nx = 621
+nz = 501
+nx = 501
 
 # Modelo de 3 camadas
 camadas = np.zeros((nz, nx),dtype=np.float32)
@@ -74,4 +74,4 @@ plt.xlabel('distância (m)')
 plt.ylabel('profundidade (m)')
 plt.show()
 
-camadas.tofile(f"Vp_camadas_{nz}x{nx}.bin")
+camadas.T.tofile(f"Vp_camadas_{nz}x{nx}.bin")

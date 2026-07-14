@@ -40,7 +40,7 @@ int main(){
 
     //Cerjan boudary
 
-    int Nboudary = 60; //number of the edge points
+    int Nboudary = 100; //number of the edge points
         
     int nx = int(L/dx) + 1; //number of spatial points in X
     int nz = int(L/dz) + 1; //number of spatial points in Z
@@ -55,7 +55,7 @@ int main(){
     float *z = linspace(0.0, nz, nz);
     float *t = linspace(0.0, (nt - 1) * dt, nt);
 
-    int nrec = nx_abc - 2 * Nboudary;
+    int nrec = 381;
     int Nsource = 1;
 
     //----------------------------------
@@ -70,7 +70,9 @@ int main(){
     }
 
     fprintf(file_parameters, "T = %d\n", T);
-
+    
+    fprintf(file_parameters, "nx = %d\n", nx);
+    fprintf(file_parameters, "nz = %d\n", nz);
     fprintf(file_parameters, "nx_abc = %d\n", nx_abc);
     fprintf(file_parameters, "nz_abc = %d\n", nz_abc);
     fprintf(file_parameters, "nt = %d\n", nt);

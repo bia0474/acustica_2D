@@ -1,33 +1,5 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <iostream>
-
-//----------------------------------
-// check geometry function
-//----------------------------------
-
-bool checkGeometry(const int *sx, const int *sz, int Nsource, const int *rx, const int *rz, int Nrec, int nx_abc, int nz_abc, int Nboudary){
-
-    for(int i = 0; i < Nsource; i++){
-        
-        if(sx[i] < Nboudary || sx[i] >= nx_abc - Nboudary || sz[i] < Nboudary || sz[i] >= nz_abc - Nboudary){
-            
-            std::cout << "Erro: Fonte " << i << " esta dentro da borda de absorcao.\n";
-            return false;
-        }
-    }
-
-    for(int j = 0; j < Nrec; j++){
-
-        if(rx[j] < Nboudary || rx[j] >= nx_abc - Nboudary || rz[j] < Nboudary || rz[j] >= nz_abc - Nboudary){
-
-            std::cout << "Erro: Receptor " << j << " esta dentro da borda de absorcao.\n";
-            return false;
-        }
-    }
-
-    return true;
-}
 
 //----------------------------------
 // linscpace function
@@ -61,69 +33,26 @@ int* linspace(int start, int end, int quantity, int endpoint){
 
 int main(){
 
-    //----------------------------------
-    // open the document of PARAMETERS
-    //----------------------------------
-
-    FILE *file = fopen("/home/processamento/acustica_2D/inputs/parameters.txt", "r");
-
-    if(file == NULL){
-        printf("Erro ao abrir arquivo de parametros\n");
-        return 1;
-    }
-
-    char linha[256];
-
-    int Nrec = 0;
-    int Nsource = 0;
-    int nx_abc = 0;
-    int nz_abc = 0;
-    int Nboudary = 0;
-
-    while(fgets(linha, sizeof(linha), file)){
-
-        if(sscanf(linha, "nrec = %d", &Nrec) == 1){
-            continue;
-        }
-
-        if(sscanf(linha, "Nsource = %d", &Nsource) == 1){
-            continue;
-        }
-
-        if(sscanf(linha, "nx_abc = %d", &nx_abc) == 1){
-            continue;
-        }
-
-        if(sscanf(linha, "nz_abc = %d", &nz_abc) == 1){
-            continue;
-        }
-
-        if(sscanf(linha, "Nboudary = %d", &Nboudary) == 1){
-            continue;
-        }
-    }
-
-    fclose(file);
-
     //-------------------------------
     // Sources
     //-------------------------------
 
     int sx_init = 0;
-    int sx_end = 310;
+    int sx_end = 250;
+    int Nsource = 1;
 
     int *sx = linspace(sx_init, sx_end, Nsource, 0);
 
     int *sz = (int*) malloc(Nsource * sizeof(int));
 
-    for(int i = 0; i < Nsource; i++){
-
-        sz[i] = 40.0f + Nboudary;
-    }
-
     if(sz == NULL){
         printf("Erro ao alocar memoria\n");
         return 1;
+    }
+
+    for(int i = 0; i < Nsource; i++){
+
+        sz[i] = 100.0f;
     }
 
     int *sIdx = (int*) malloc(Nsource * sizeof(int));
@@ -142,8 +71,9 @@ int main(){
     // RECEIVERS
     //----------------------------------
 
-    int rx_init = Nboudary;
-    int rx_end = nx_abc - Nboudary - 1;
+    int rx_init = 60;
+    int rx_end = 440;
+    int Nrec = 381;
 
     int *rx = linspace(rx_init, rx_end, Nrec, 1);
 
@@ -156,7 +86,7 @@ int main(){
 
     for(int i = 0; i < Nrec; i++){
 
-        rz[i] = 60.0f + Nboudary;
+        rz[i] = 60.0f;
     }
 
     int *rIdx = (int*) malloc(Nrec * sizeof(int));
@@ -172,25 +102,17 @@ int main(){
     }
 
     //----------------------------------
-    // check geometry 
-    //----------------------------------
-
-    if (!checkGeometry(sx, sz, Nsource, rx, rz, Nrec, nx_abc, nz_abc, Nboudary)){
-        return 1;
-    }
-
-    //----------------------------------
     // SOURCES DATA in csv
     //----------------------------------
 
-    FILE *file_sources = fopen("/home/processamento/acustica_2D/inputs/sources.csv", "w"); //Creates a pointer to a file and opens a file named "sources.csv" in write mode (w)
+    FILE *file_sources = fopen("/home/processamento/acustica_2D/inputs/sources.csv", "w"); //cria um ponteiro para um arquivo e abre um arquivo chamado "sources.csv" no modo write("w") (escrita)
 
     if(file_sources == NULL){
         printf("Erro ao abrir sources.csv\n");
         return 1;
     }
 
-    fprintf(file_sources, "index,coordx,coordz\n"); //writing the header
+    fprintf(file_sources, "index,coordx,coordz\n"); //escrevendo o cabeçalho
 
     for(int i = 0; i < Nsource; i++){
 
@@ -203,10 +125,9 @@ int main(){
     // RECEIVERS DATA in csv
     //----------------------------------
 
-    FILE *file_receivers = fopen("/home/processamento/acustica_2D/inputs/receivers.csv", "w"); //Creates a pointer to a file and opens a file named "receivers.csv" in write mode (w)
+    FILE *file_receivers = fopen("/home/processamento/acustica_2D/inputs/receivers.csv", "w"); //cria um ponteiro para um arquivo e abre um arquivo chamado "receivers.csv" no modo write("w") (escrita)
 
-
-    fprintf(file_receivers, "index,coordx,coordz\n"); //writing the header
+    fprintf(file_receivers, "index,coordx,coordz\n"); //escrevendo o cabeçalho
 
     for(int i = 0; i < Nrec; i++){
 

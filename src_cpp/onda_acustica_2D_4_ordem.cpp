@@ -38,7 +38,7 @@ float* linspace(float start, int end, int quantity){//this function calculates t
 // read parameters function
 //----------------------------------
 
-void readParameters(const char *filename, int *T, int *nx_abc, int *nz_abc, int *nt, float *dx, float *dz, float *dt, float *f0, int *Nboudary, int *Nsource, int *nrec, char receivers_file[], char sources_file[], char velocity_file[], float **x, float **z, float **t){
+void readParameters(const char *filename, int *T, int *nx, int *nz, int *nx_abc, int *nz_abc, int *nt, float *dx, float *dz, float *dt, float *f0, int *Nboudary, int *Nsource, int *nrec, char receivers_file[], char sources_file[], char velocity_file[], float **x, float **z, float **t){
 
     FILE *file_parameters = fopen(filename, "r");
 
@@ -52,6 +52,10 @@ void readParameters(const char *filename, int *T, int *nx_abc, int *nz_abc, int 
     while(fgets(linha, sizeof(linha), file_parameters)){
 
         if(sscanf(linha, "T = %d", T) == 1) continue;
+
+        if(sscanf(linha, "nx = %d", nx) == 1) continue;
+
+        if(sscanf(linha, "nz = %d", nz) == 1) continue;
 
         if(sscanf(linha, "nx_abc = %d", nx_abc) == 1) continue;
 
@@ -92,7 +96,7 @@ void readParameters(const char *filename, int *T, int *nx_abc, int *nz_abc, int 
 // read receivers function
 //----------------------------------
 
-Receiver* readReceivers(const char *receivers_file, int nrec){
+Receiver* readReceivers(const char *receivers_file, int nrec, int Nboudary){
 
     Receiver *receivers = (Receiver*) malloc(nrec * sizeof(Receiver));
 
@@ -125,8 +129,8 @@ Receiver* readReceivers(const char *receivers_file, int nrec){
         std::getline(ss, rx, ',');
         std::getline(ss, rz, ',');
 
-        receivers[i].x = std::stoi(rx);
-        receivers[i].z = std::stoi(rz);
+        receivers[i].x = std::stoi(rx) + Nboudary;
+        receivers[i].z = std::stoi(rz) + Nboudary;
 
         i++;
     }
@@ -140,7 +144,7 @@ Receiver* readReceivers(const char *receivers_file, int nrec){
 // read sources function
 //----------------------------------
 
-void readSources(const char *sources_file, int Nsource, int **sx, int **sz){
+void readSources(const char *sources_file, int Nsource, int **sx, int **sz, int Nboudary){
 
     *sx = (int*) malloc(Nsource * sizeof(int));
     *sz = (int*) malloc(Nsource * sizeof(int));
@@ -177,8 +181,8 @@ void readSources(const char *sources_file, int Nsource, int **sx, int **sz){
         std::getline(ss, sx_str, ',');
         std::getline(ss, sz_str, ',');
 
-        (*sx)[i] = std::stoi(sx_str);
-        (*sz)[i] = std::stoi(sz_str);
+        (*sx)[i] = std::stoi(sx_str) + Nboudary;
+        (*sz)[i] = std::stoi(sz_str) + Nboudary;
 
         i++;
     }
@@ -190,7 +194,7 @@ void readSources(const char *sources_file, int Nsource, int **sx, int **sz){
 // read velocity model function
 //----------------------------------
 
-float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
+float* readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int nz_abc, int Nboudary){
 
     FILE *file = fopen(velocity_file, "rb");
 
@@ -199,7 +203,7 @@ float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
         exit(1);
     }
 
-    float *c = (float*) malloc(nx_abc * nz_abc * sizeof(float));
+    float *c = (float*) malloc(nx * nz * sizeof(float));
 
     if(c == NULL){
         printf("Erro ao alocar memória para c.\n");
@@ -207,9 +211,9 @@ float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
         exit(1);
     }
 
-    size_t n = fread(c, sizeof(float), nx_abc * nz_abc, file);
+    size_t n = fread(c, sizeof(float), nx * nz, file);
 
-    if(n != (size_t)(nx_abc * nz_abc)){
+    if(n != (size_t)(nx * nz)){
         printf("Erro na leitura do modelo de velocidade.\n");
         free(c);
         fclose(file);
@@ -218,7 +222,57 @@ float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
 
     fclose(file);
 
-    return c;
+    float *c_exp = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //expanding c
+
+    for(int i = 0; i < nx; i++){
+        for(int j = 0; j < nz; j++){ //copiando o modelo para a malha sem a borda
+
+            int ix = i + Nboudary;
+            int iz = j + Nboudary;
+
+            c_exp[ix * nz_abc + iz] = c[i * nz + j];
+        }
+    }
+
+    for (int i = 0; i < Nboudary; i++) {
+
+        for (int j = Nboudary; j < nz_abc - Nboudary; j++) { //left
+
+            int ix = Nboudary;
+
+            c_exp[i * nz_abc + j] = c_exp[ix * nz_abc + j];
+        }
+    }
+
+    for (int i = nx_abc - Nboudary; i < nx_abc; i++) {
+        for (int j = Nboudary; j < nz_abc - Nboudary; j++) { //right
+
+            int ix = nx_abc - Nboudary - 1;
+            
+            c_exp[i * nz_abc + j] = c_exp[ix * nz_abc + j];
+        }
+    }
+
+    for (int i = 0; i < nx_abc; i++) {
+        for (int j = 0; j < Nboudary; j++) { //top
+
+            int iz = Nboudary;
+
+            c_exp[i * nz_abc + j] = c_exp[i * nz_abc + iz];
+        }
+    }
+
+    for (int i = 0; i < nx_abc; i++) {
+        for (int j = nz_abc - Nboudary; j < nz_abc; j++) { //base
+
+            int iz = nz_abc - Nboudary - 1;
+
+            c_exp[i * nz_abc + j] = c_exp[i * nz_abc + iz];
+        }
+    }
+
+    free(c);
+    return c_exp;
 }
 
 /* 
@@ -269,6 +323,32 @@ float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
 }
 */
 
+//----------------------------------
+// check geometry function
+//----------------------------------
+
+bool checkGeometry(const int *sx, const int *sz, int Nsource, Receiver *receivers, int nrec, int nx, int nz, int Nboudary){
+
+    for(int i = 0; i < Nsource; i++){
+        
+        if(sx[i] < Nboudary || sx[i] >= nx + Nboudary || sz[i] < Nboudary || sz[i] >= nz + Nboudary){
+            
+            std::cout << "Erro: Fonte " << i << " esta dentro da borda de absorcao.\n";
+            return false;
+        }
+    }
+
+    for(int j = 0; j < nrec; j++){
+
+        if(receivers[j].x < Nboudary || receivers[j].x >= nx + Nboudary || receivers[j].z < Nboudary || receivers[j].z >= nz + Nboudary){
+
+            std::cout << "Erro: Receptor " << j << " esta dentro da borda de absorcao.\n";
+            return false;
+        }
+    }
+
+    return true;
+}
 
 //-------------------------------
 // Cerjan - absorving boudanry
@@ -379,7 +459,7 @@ float* source(float f0, const float* t, int nt){
 // Wave equation
 //----------------------------------
 
-float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx_abc, int nz_abc, int nt, const float* f, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
+float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nx_abc, int nz_abc, int nt, const float* f, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
 
     float *u_old = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //passed field
     float *u_curr = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //present field
@@ -513,7 +593,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     //-----------------------------------
     // SAVE THE DOCUMENT OF THE SISMOGRAM
     //-----------------------------------
-            
+
     std::ofstream file("/home/processamento/acustica_2D/outputs/seismogram.bin", std::ios::binary);
 
     file.write(reinterpret_cast<char*>(seismogram), nrec * nt * sizeof(float));
@@ -553,6 +633,8 @@ int main(){
 //----------------------------------
 
     int T;
+    int nx;
+    int nz;
     int nx_abc;
     int nz_abc;
     int nt;
@@ -573,19 +655,19 @@ int main(){
     float *z = NULL;
     float *t = NULL;
 
-    readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
+    readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx, &nz, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
 
 //----------------------------------
 // open the document of RECEIVERS
 //----------------------------------
 
-    Receiver *receivers = readReceivers(receivers_file, nrec);
+    Receiver *receivers = readReceivers(receivers_file, nrec, Nboudary);
 
 //-----------------------------------------
 // open the document of the VELOCITY MODEL
 //-----------------------------------------
 
-    float *c = readVelocity("/home/processamento/acustica_2D/src_cpp/Vp_camadas_621x621.bin", nx_abc, nz_abc);
+    float *c = readVelocity("/home/processamento/acustica_2D/src_cpp/Vp_camadas_501x501.bin", nx, nz, nx_abc, nz_abc, Nboudary);
 
 //------------------------------------------
 // open the document of the SOURCE
@@ -594,8 +676,15 @@ int main(){
     int *sx = NULL;
     int *sz = NULL;
 
-    readSources(sources_file, Nsource, &sx, &sz);
+    readSources(sources_file, Nsource, &sx, &sz, Nboudary);
 
+//----------------------------------
+// check geometry 
+//----------------------------------
+
+    if (!checkGeometry(sx, sz, Nsource, receivers, nrec, nx, nz, Nboudary)){
+        return 1;
+    }
 //-----------------------------------------
 // call the source fuction
 //-----------------------------------------
@@ -614,7 +703,7 @@ int main(){
 // wavefield
 //----------------------------------
 
-    float *wavefield = derivates(c, dt, dx, dz, fonte, nx_abc, nz_abc, nt, f, Nboudary, sx, sz, Nsource, receivers, nrec); 
+    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nx_abc, nz_abc, nt, f, Nboudary, sx, sz, Nsource, receivers, nrec); 
 
 //---------------------------------------
 // Save binary document of the simulation

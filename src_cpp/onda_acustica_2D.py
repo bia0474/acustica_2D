@@ -14,6 +14,8 @@ with open("/home/processamento/acustica_2D/inputs/parameters.txt") as file:
         key, value = line.strip().split(" = ")
         parameters[key] = value
 
+nx = int(parameters["nx"])
+nz = int(parameters["nz"])
 nx_abc = int(parameters["nx_abc"])
 nz_abc = int(parameters["nz_abc"])
 nt = int(parameters["nt"])
@@ -31,11 +33,11 @@ Nboudary = int(parameters["Nboudary"])
 
 data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
 
-wavefield = data.reshape((nx_abc - 2 * Nboudary, nz_abc - 2 * Nboudary))
+wavefield = data.reshape((nx, nz))
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, (nx_abc - 2 * Nboudary)*dx, (nz_abc - 2 * Nboudary)*dz, 0], aspect="auto")
+plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto")
 
 plt.colorbar(label="Amplitude")
 
@@ -53,9 +55,9 @@ plt.show()
 fig, ax = plt.subplots(figsize=(8,6))
 
 first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
-first = first.reshape((nx_abc - 2 * Nboudary, nz_abc - 2 * Nboudary))
+first = first.reshape((nx, nz))
 
-img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, (nx_abc - 2 * Nboudary)*dx, (nz_abc - 2 * Nboudary)*dz, 0], aspect="auto", animated=True)
+img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto", animated=True)
 
 plt.colorbar(img)
 
@@ -68,7 +70,7 @@ def update(frame):
 
     data = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_{frame}.bin", dtype=np.float32)
 
-    wavefield = data.reshape((nx_abc - 2 * Nboudary, nz_abc - 2 * Nboudary))
+    wavefield = data.reshape((nx, nz))
 
     img.set_array(wavefield.T)
 
@@ -84,13 +86,13 @@ plt.show()
 # velocity model
 #----------------------------------
 
-vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/Vp_camadas_621x621.bin", dtype=np.float32)
+vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/Vp_camadas_501x501.bin", dtype=np.float32)
 
-vel = vel.reshape((nx_abc, nz_abc))
+vel = vel.reshape((nx, nz))
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(vel, origin="upper", extent=[0, (nx_abc - 2 * Nboudary) * dx, (nz_abc - 2 * Nboudary) * dz, 0], aspect="auto")
+plt.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
 
 plt.colorbar(label="Velocity (m/s)")
 
