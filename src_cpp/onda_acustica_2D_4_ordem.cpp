@@ -190,15 +190,12 @@ void readSources(const char *sources_file, int Nsource, int **sx, int **sz, int 
     file.close();
 }
 
-//-------------------------------------
-// read velocity model by Yuri function
-//-------------------------------------
+//---------------------------------------
+// read velocity model by Yuri (function)
+//---------------------------------------
 
-float* readVelocity(const char *velocity_file,
-                    int nx, int nz,
-                    int nx_abc, int nz_abc,
-                    int Nboudary)
-{
+float* readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int nz_abc, int Nboudary){
+
     FILE *file = fopen(velocity_file, "rb");
 
     if (file == NULL) {
@@ -209,6 +206,7 @@ float* readVelocity(const char *velocity_file,
     float *c = (float*) malloc(nx * nz * sizeof(float));
 
     fread(c, sizeof(float), nx * nz, file);
+    
     fclose(file);
 
     float *c_exp = (float*) calloc(nx_abc * nz_abc, sizeof(float));
@@ -220,8 +218,7 @@ float* readVelocity(const char *velocity_file,
     for (int i = 0; i < nx; i++) {
         for (int j = 0; j < nz; j++) {
 
-            c_exp[(i + Nboudary) * nz_abc + (j + Nboudary)] =
-                c[i * nz + j];
+            c_exp[(i + Nboudary) * nz_abc + (j + Nboudary)] = c[i * nz + j];
         }
     }
 
@@ -232,8 +229,7 @@ float* readVelocity(const char *velocity_file,
     for (int i = 0; i < Nboudary; i++) {
         for (int j = Nboudary; j < nz_abc - Nboudary; j++) {
 
-            c_exp[i * nz_abc + j] =
-                c_exp[Nboudary * nz_abc + j];
+            c_exp[i * nz_abc + j] = c_exp[Nboudary * nz_abc + j];
         }
     }
 
@@ -244,8 +240,7 @@ float* readVelocity(const char *velocity_file,
     for (int i = nx_abc - Nboudary; i < nx_abc; i++) {
         for (int j = Nboudary; j < nz_abc - Nboudary; j++) {
 
-            c_exp[i * nz_abc + j] =
-                c_exp[(nx_abc - Nboudary - 1) * nz_abc + j];
+            c_exp[i * nz_abc + j] = c_exp[(nx_abc - Nboudary - 1) * nz_abc + j];
         }
     }
 

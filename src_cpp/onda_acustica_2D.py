@@ -86,13 +86,13 @@ plt.show()
 # velocity model
 #----------------------------------
 
-vel = np.fromfile("/home/processamento/acustica_2D/outputs/velocityModel_exp.bin", dtype=np.float32)
+vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/Vp_camadas_501x501.bin", dtype=np.float32)
 
-vel = vel.reshape((nx_abc, nz_abc))
+vel = vel.reshape((nx, nz))
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(vel.T, origin="upper", extent=[0, nx_abc * dx, nz_abc * dz, 0], aspect="auto")
+plt.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
 
 plt.colorbar(label="Velocity (m/s)")
 
