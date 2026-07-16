@@ -190,91 +190,139 @@ void readSources(const char *sources_file, int Nsource, int **sx, int **sz, int 
     file.close();
 }
 
-//----------------------------------
-// read velocity model function
-//----------------------------------
+//-------------------------------------
+// read velocity model by Yuri function
+//-------------------------------------
 
-float* readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int nz_abc, int Nboudary){
-
+float* readVelocity(const char *velocity_file,
+                    int nx, int nz,
+                    int nx_abc, int nz_abc,
+                    int Nboudary)
+{
     FILE *file = fopen(velocity_file, "rb");
 
-    if(file == NULL){
+    if (file == NULL) {
         printf("Erro ao abrir o arquivo do modelo de velocidade.\n");
         exit(1);
     }
 
     float *c = (float*) malloc(nx * nz * sizeof(float));
 
-    if(c == NULL){
-        printf("Erro ao alocar memória para c.\n");
-        fclose(file);
-        exit(1);
-    }
-
-    size_t n = fread(c, sizeof(float), nx * nz, file);
-
-    if(n != (size_t)(nx * nz)){
-        printf("Erro na leitura do modelo de velocidade.\n");
-        free(c);
-        fclose(file);
-        exit(1);
-    }
-
+    fread(c, sizeof(float), nx * nz, file);
     fclose(file);
 
-    float *c_exp = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //expanding c
+    float *c_exp = (float*) calloc(nx_abc * nz_abc, sizeof(float));
 
-    for(int i = 0; i < nx; i++){
-        for(int j = 0; j < nz; j++){ //copiando o modelo para a malha sem a borda
+    //----------------------------------
+    // Centro
+    //----------------------------------
 
-            int ix = i + Nboudary;
-            int iz = j + Nboudary;
+    for (int i = 0; i < nx; i++) {
+        for (int j = 0; j < nz; j++) {
 
-            c_exp[ix * nz_abc + iz] = c[i * nz + j];
+            c_exp[(i + Nboudary) * nz_abc + (j + Nboudary)] =
+                c[i * nz + j];
         }
     }
+
+    //----------------------------------
+    // Borda superior
+    //----------------------------------
 
     for (int i = 0; i < Nboudary; i++) {
+        for (int j = Nboudary; j < nz_abc - Nboudary; j++) {
 
-        for (int j = Nboudary; j < nz_abc - Nboudary; j++) { //left
-
-            int ix = Nboudary;
-
-            c_exp[i * nz_abc + j] = c_exp[ix * nz_abc + j];
+            c_exp[i * nz_abc + j] =
+                c_exp[Nboudary * nz_abc + j];
         }
     }
+
+    //----------------------------------
+    // Borda inferior
+    //----------------------------------
 
     for (int i = nx_abc - Nboudary; i < nx_abc; i++) {
-        for (int j = Nboudary; j < nz_abc - Nboudary; j++) { //right
+        for (int j = Nboudary; j < nz_abc - Nboudary; j++) {
 
-            int ix = nx_abc - Nboudary - 1;
-            
-            c_exp[i * nz_abc + j] = c_exp[ix * nz_abc + j];
+            c_exp[i * nz_abc + j] =
+                c_exp[(nx_abc - Nboudary - 1) * nz_abc + j];
         }
     }
 
-    for (int i = 0; i < nx_abc; i++) {
-        for (int j = 0; j < Nboudary; j++) { //top
+    //----------------------------------
+    // Borda esquerda
+    //----------------------------------
 
-            int iz = Nboudary;
+    for (int i = Nboudary; i < nx_abc - Nboudary; i++) {
+        for (int j = 0; j < Nboudary; j++) {
 
-            c_exp[i * nz_abc + j] = c_exp[i * nz_abc + iz];
+            c_exp[i * nz_abc + j] = c_exp[i * nz_abc + Nboudary];
         }
     }
 
-    for (int i = 0; i < nx_abc; i++) {
-        for (int j = nz_abc - Nboudary; j < nz_abc; j++) { //base
+    //----------------------------------
+    // Borda direita
+    //----------------------------------
 
-            int iz = nz_abc - Nboudary - 1;
+    for (int i = Nboudary; i < nx_abc - Nboudary; i++) {
+        for (int j = nz_abc - Nboudary; j < nz_abc; j++) {
 
-            c_exp[i * nz_abc + j] = c_exp[i * nz_abc + iz];
+            c_exp[i * nz_abc + j] = c_exp[i * nz_abc + (nz_abc - Nboudary - 1)];
+        }
+    }
+
+    //----------------------------------
+    // Canto superior esquerdo
+    //----------------------------------
+
+    for (int i = 0; i < Nboudary; i++) {
+        for (int j = 0; j < Nboudary; j++) {
+
+            c_exp[i * nz_abc + j] = c[0];
+        }
+    }
+
+    //----------------------------------
+    // Canto superior direito
+    //----------------------------------
+
+    for (int i = 0; i < Nboudary; i++) {
+        for (int j = nz_abc - Nboudary; j < nz_abc; j++) {
+
+            c_exp[i * nz_abc + j] = c[nz - 1];
+        }
+    }
+
+    //----------------------------------
+    // Canto inferior esquerdo
+    //----------------------------------
+
+    for (int i = nx_abc - Nboudary; i < nx_abc; i++) {
+        for (int j = 0; j < Nboudary; j++) {
+
+            c_exp[i * nz_abc + j] = c[(nx - 1) * nz];
+        }
+    }
+
+    //----------------------------------
+    // Canto inferior direito
+    //----------------------------------
+
+    for (int i = nx_abc - Nboudary; i < nx_abc; i++) {
+        for (int j = nz_abc - Nboudary; j < nz_abc; j++) {
+
+            c_exp[i * nz_abc + j] = c[(nx - 1) * nz + (nz - 1)];
         }
     }
 
     free(c);
+
     return c_exp;
 }
 
+//-------------------------------------
+// read velocity model by me function
+//-------------------------------------
 /* 
 float* readVelocity(const char *velocity_file, int nx_abc, int nz_abc){
 
@@ -669,6 +717,11 @@ int main(){
 
     float *c = readVelocity("/home/processamento/acustica_2D/src_cpp/Vp_camadas_501x501.bin", nx, nz, nx_abc, nz_abc, Nboudary);
 
+    std::ofstream file_velocity("/home/processamento/acustica_2D/outputs/velocityModel_exp.bin", std::ios::binary);
+
+    file_velocity.write(reinterpret_cast<char*>(c), nx_abc * nz_abc * sizeof(float)); 
+
+    file_velocity.close();
 //------------------------------------------
 // open the document of the SOURCE
 //-----------------------------------------
