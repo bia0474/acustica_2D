@@ -26,7 +26,7 @@ dt = float(parameters["dt"])
 
 nrec = int(parameters["nrec"])
 Nboudary = int(parameters["Nboudary"])
-
+'''
 #----------------------------------
 # plot one snap of the simulation
 #----------------------------------
@@ -47,7 +47,30 @@ plt.ylabel("z (m)")
 plt.title("Wavefield Snapshot")
 
 plt.show()
+'''
+#----------------------------------
+# plot the PVxz
+#----------------------------------
 
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", dtype=np.float32).reshape((nz_abc, nx_abc))
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", dtype=np.float32).reshape((nz_abc, nx_abc))
+
+
+x = np.arange(nx_abc)
+z = np.arange(nz_abc)
+
+X, Z = np.meshgrid(x, z)
+
+modulo = np.sqrt(PVx**2 + PVz**2)
+
+plt.figure(figsize=(8,6))
+
+q = plt.quiver(X[::5, ::5], Z[::5, ::5], PVx[::5, ::5], PVz[::5, ::5], modulo[::5, ::5], cmap='jet')
+
+plt.colorbar(q, label='|P|')
+plt.show()
+
+'''
 #----------------------------------
 # animatiom 1D acustic wave
 #----------------------------------
@@ -125,4 +148,4 @@ plt.title("Seismogram")
 plt.colorbar()
 
 plt.show()
-
+'''

@@ -206,7 +206,7 @@ float* readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     float *c = (float*) malloc(nx * nz * sizeof(float));
 
     fread(c, sizeof(float), nx * nz, file);
-    
+
     fclose(file);
 
     float *c_exp = (float*) calloc(nx_abc * nz_abc, sizeof(float));
@@ -508,12 +508,25 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     float *u_curr = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //present field
     float *u_next = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //future field
 
+//----------------------------------
+// vector of the PV 
+//----------------------------------
+
+    float *PVx = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //vector d2P/dx2
+    float *PVz = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //vector d2P/dz2
+
+//----------------------------------
+// inicialization of vectors
+//----------------------------------
+
     #pragma omp parallel for
     for(int i = 0; i < nx_abc * nz_abc; i++){ //inicialization
 
         u_old[i] = 0.0f;
         u_curr[i] = 0.0f;
         u_next[i] = 0.0f;
+        PVx[i] = 0.0f;
+        PVz[i] = 0.0f;
     }
 
 //----------------------------------
@@ -561,11 +574,30 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
             for(int i = 2; i < nz_abc - 2; i++){ //traverses all points of the grid in Z
 
+                //----------------------------------
+                // finite dofferences
+                //----------------------------------
+
                 float d2x = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] -u_curr[(j - 2) * nz_abc + i])/(12 * dx * dx);
 
                 float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i-1)] - u_curr[j * nz_abc + (i - 2)])/(12 * dz * dz);
 
                 u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_old[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
+
+
+                //----------------------------------
+                // Poynting vectors
+                //----------------------------------
+
+                float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i])/(2 * dt);
+
+                float Uxx = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] -u_curr[(j - 2) * nz_abc + i])/(12 * dx * dx);
+
+                float Uzz = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i-1)] - u_curr[j * nz_abc + (i - 2)])/(12 * dz * dz);
+
+                PVx[j * nz_abc + i] = - dUdt * Uxx;
+                PVz[j * nz_abc + i] = - dUdt * Uzz;
+
             }
         }
 
@@ -606,10 +638,36 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
         }
 
-        //-------------------------------------
-        // SAVE SNAPSHOT HERE (binary document)
-        //------------------------------------
-         
+        /* 
+        //------------------------------------------
+        // SAVE ONDE SNAPSHOT HERE (binary document)
+        //------------------------------------------
+
+        std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_500.bin", std::ios::binary);
+
+        file.write(reinterpret_cast<char*>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves snap without the absorbent border
+
+        file.close();
+        */
+        //---------------------------------------------
+        // SAVE THE PV HERE (binary document)
+        //---------------------------------------------
+
+        std::ofstream file_PVx("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", std::ios::binary);
+
+        file_PVx.write(reinterpret_cast<char*>(PVx), nx_abc * nz_abc * sizeof(float)); //saves PV values
+
+        file_PVx.close();
+
+        std::ofstream file_PVz("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", std::ios::binary);
+
+        file_PVz.write(reinterpret_cast<char*>(PVz), nx_abc * nz_abc * sizeof(float)); //saves PV values
+
+        file_PVz.close();
+
+        //---------------------------------------------
+        // SAVE ALL THE SNAPSHOT HERE (binary document)
+        //---------------------------------------------
          if(n % 100 == 0){
 
             std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
@@ -621,6 +679,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
             }
 
             file.close();
+        
         }
         //----------------------------------
         // advance in time
@@ -644,6 +703,8 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     file.close();
 
     std::cout << "Seismogram binary file saved!" << std::endl;
+    std::cout << "Poynting Vector direction z binary file saved!" << std::endl;
+    std::cout << "Snapshot binary file saved!" << std::endl;
 
     //-----------------------------------
     // SAVE the copy of the final field
