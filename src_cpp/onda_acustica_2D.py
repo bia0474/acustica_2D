@@ -52,22 +52,30 @@ plt.show()
 # plot the PVxz
 #----------------------------------
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", dtype=np.float32).reshape((nz_abc, nx_abc))
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", dtype=np.float32).reshape((nz_abc, nx_abc))
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", dtype=np.float32)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", dtype=np.float32)
 
+PVx = PVx.reshape((nx_abc, nz_abc))
+PVz = PVz.reshape((nx_abc, nz_abc))
 
-x = np.arange(nx_abc)
-z = np.arange(nz_abc)
+x = np.arange(nx_abc) 
+z = np.arange(nz_abc) 
 
-X, Z = np.meshgrid(x, z)
+X, Z = np.meshgrid(z, x)
 
-modulo = np.sqrt(PVx**2 + PVz**2)
+step = 20
 
 plt.figure(figsize=(8,6))
 
-q = plt.quiver(X[::5, ::5], Z[::5, ::5], PVx[::5, ::5], PVz[::5, ::5], modulo[::5, ::5], cmap='jet')
+plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], PVz[::step, ::step], pivot='tail')
 
-plt.colorbar(q, label='|P|')
+#width: espessura do corpo da seta
+#headwidth: largura da ponta da seta
+#headlength: comprimento da ponta da seta
+
+
+plt.gca().invert_yaxis()
+plt.axis('equal')
 plt.show()
 
 '''

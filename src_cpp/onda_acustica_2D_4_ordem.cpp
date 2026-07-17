@@ -514,6 +514,8 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
     float *PVx = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //vector d2P/dx2
     float *PVz = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //vector d2P/dz2
+    float *Px_unit = (float*) malloc(nx_abc * nz_abc * sizeof(float)); 
+    float *Pz_unit = (float*) malloc(nx_abc * nz_abc * sizeof(float));
 
 //----------------------------------
 // inicialization of vectors
@@ -527,6 +529,8 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         u_next[i] = 0.0f;
         PVx[i] = 0.0f;
         PVz[i] = 0.0f;
+        Px_unit[i] = 0.0f;
+        Pz_unit[i] = 0.0f;
     }
 
 //----------------------------------
@@ -591,13 +595,18 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
                 float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i])/(2 * dt);
 
-                float Uxx = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] -u_curr[(j - 2) * nz_abc + i])/(12 * dx * dx);
+                float Uxx = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i])/(12 * dx);
 
-                float Uzz = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i-1)] - u_curr[j * nz_abc + (i - 2)])/(12 * dz * dz);
+                float Uzz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)])/(12 * dz);
 
                 PVx[j * nz_abc + i] = - dUdt * Uxx;
                 PVz[j * nz_abc + i] = - dUdt * Uzz;
 
+                float modulo = sqrt(PVx[j * nz_abc + i] * PVx[j * nz_abc + i] + PVz[j * nz_abc + i] * PVz[j * nz_abc + i]);
+
+                Px_unit[j * nz_abc + i] =  PVx[j * nz_abc + i]/modulo;
+                Pz_unit[j * nz_abc + i] =  PVz[j * nz_abc + i]/modulo;
+                
             }
         }
 
@@ -655,13 +664,13 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
         std::ofstream file_PVx("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", std::ios::binary);
 
-        file_PVx.write(reinterpret_cast<char*>(PVx), nx_abc * nz_abc * sizeof(float)); //saves PV values
+        file_PVx.write(reinterpret_cast<char*>(Px_unit), nx_abc * nz_abc * sizeof(float)); //saves PV values
 
         file_PVx.close();
 
         std::ofstream file_PVz("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", std::ios::binary);
 
-        file_PVz.write(reinterpret_cast<char*>(PVz), nx_abc * nz_abc * sizeof(float)); //saves PV values
+        file_PVz.write(reinterpret_cast<char*>(Pz_unit), nx_abc * nz_abc * sizeof(float)); //saves PV values
 
         file_PVz.close();
 
