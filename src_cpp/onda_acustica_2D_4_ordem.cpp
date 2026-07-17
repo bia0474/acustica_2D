@@ -588,25 +588,25 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
                 u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_old[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
 
-
                 //----------------------------------
                 // Poynting vectors
                 //----------------------------------
 
-                float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i])/(2 * dt);
+                if(n == 1000){
+                    float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i])/(2 * dt);
 
-                float Uxx = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i])/(12 * dx);
+                    float Uxx = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i])/(12 * dx);
 
-                float Uzz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)])/(12 * dz);
+                    float Uzz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)])/(12 * dz);
 
-                PVx[j * nz_abc + i] = - dUdt * Uxx;
-                PVz[j * nz_abc + i] = - dUdt * Uzz;
+                    PVx[j * nz_abc + i] = - dUdt * Uxx;
+                    PVz[j * nz_abc + i] = - dUdt * Uzz;
 
-                float modulo = sqrt(PVx[j * nz_abc + i] * PVx[j * nz_abc + i] + PVz[j * nz_abc + i] * PVz[j * nz_abc + i]);
+                    float modulo = sqrt(PVx[j * nz_abc + i] * PVx[j * nz_abc + i] + PVz[j * nz_abc + i] * PVz[j * nz_abc + i]);
 
-                Px_unit[j * nz_abc + i] =  PVx[j * nz_abc + i]/modulo;
-                Pz_unit[j * nz_abc + i] =  PVz[j * nz_abc + i]/modulo;
-                
+                    Px_unit[j * nz_abc + i] =  PVx[j * nz_abc + i]/modulo;
+                    Pz_unit[j * nz_abc + i] =  PVz[j * nz_abc + i]/modulo;   
+                } 
             }
         }
 
@@ -645,35 +645,9 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
             seismogram[i * nt + n] = u_next[xr * nz_abc + zr];
 
-        }
-
+        }   
+    
         /* 
-        //------------------------------------------
-        // SAVE ONDE SNAPSHOT HERE (binary document)
-        //------------------------------------------
-
-        std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_500.bin", std::ios::binary);
-
-        file.write(reinterpret_cast<char*>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves snap without the absorbent border
-
-        file.close();
-        */
-        //---------------------------------------------
-        // SAVE THE PV HERE (binary document)
-        //---------------------------------------------
-
-        std::ofstream file_PVx("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", std::ios::binary);
-
-        file_PVx.write(reinterpret_cast<char*>(Px_unit), nx_abc * nz_abc * sizeof(float)); //saves PV values
-
-        file_PVx.close();
-
-        std::ofstream file_PVz("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", std::ios::binary);
-
-        file_PVz.write(reinterpret_cast<char*>(Pz_unit), nx_abc * nz_abc * sizeof(float)); //saves PV values
-
-        file_PVz.close();
-
         //---------------------------------------------
         // SAVE ALL THE SNAPSHOT HERE (binary document)
         //---------------------------------------------
@@ -689,7 +663,39 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
             file.close();
         
+        }    
+        */
+        if(n == 1000){
+
+            std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
+
+            std::ofstream file_PVx("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", std::ios::binary);
+
+            std::ofstream file_PVz("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", std::ios::binary);
+
+            for(int x = Nboudary; x < nx_abc - Nboudary; x++){
+
+            //------------------------------------------
+            // SAVE ONE SNAPSHOT HERE (binary document)
+            //------------------------------------------
+
+            file.write(reinterpret_cast<char*>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves snaps without the absorbent border
+
+            //---------------------------------------------
+            // SAVE THE PV HERE (binary document)
+            //---------------------------------------------
+
+            file_PVx.write(reinterpret_cast<char*>(&Px_unit[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values
+
+            file_PVz.write(reinterpret_cast<char*>(&Pz_unit[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values  
+            
+            }
+
+            file.close();
+            file_PVx.close();
+            file_PVz.close();
         }
+
         //----------------------------------
         // advance in time
         //----------------------------------
@@ -712,7 +718,6 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     file.close();
 
     std::cout << "Seismogram binary file saved!" << std::endl;
-    std::cout << "Poynting Vector direction z binary file saved!" << std::endl;
     std::cout << "Snapshot binary file saved!" << std::endl;
 
     //-----------------------------------
@@ -768,25 +773,32 @@ int main(){
     float *z = NULL;
     float *t = NULL;
 
+    std::cout << "Starting to read the parameters!" << std::endl;
+
     readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx, &nz, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
+
+    std::cout << "End of parameter reading!" << std::endl;
 
 //----------------------------------
 // open the document of RECEIVERS
 //----------------------------------
 
+    std::cout << "Starting to read the receivers!" << std::endl;
+
     Receiver *receivers = readReceivers(receivers_file, nrec, Nboudary);
+
+    std::cout << "End of receiver reading!" << std::endl;
 
 //-----------------------------------------
 // open the document of the VELOCITY MODEL
 //-----------------------------------------
 
+    std::cout << "Starting to read the velocity model!" << std::endl;
+
     float *c = readVelocity("/home/processamento/acustica_2D/src_cpp/Vp_camadas_501x501.bin", nx, nz, nx_abc, nz_abc, Nboudary);
 
-    std::ofstream file_velocity("/home/processamento/acustica_2D/outputs/velocityModel_exp.bin", std::ios::binary);
+    std::cout << "End of velocity model reading!" << std::endl;
 
-    file_velocity.write(reinterpret_cast<char*>(c), nx_abc * nz_abc * sizeof(float)); 
-
-    file_velocity.close();
 //------------------------------------------
 // open the document of the SOURCE
 //-----------------------------------------
@@ -794,34 +806,55 @@ int main(){
     int *sx = NULL;
     int *sz = NULL;
 
+    std::cout << "Starting to read the sources!" << std::endl;
+
     readSources(sources_file, Nsource, &sx, &sz, Nboudary);
+
+    std::cout << "End of source reading!" << std::endl;
 
 //----------------------------------
 // check geometry 
 //----------------------------------
 
+    std::cout << "Starting to check the geometry!" << std::endl;
+
     if (!checkGeometry(sx, sz, Nsource, receivers, nrec, nx, nz, Nboudary)){
         return 1;
     }
+
+    std::cout << "End of check geometry!" << std::endl;
+
 //-----------------------------------------
 // call the source fuction
 //-----------------------------------------
 
+    std::cout << "Starting to source function!" << std::endl;
+
     float *fonte = source(f0, t, nt); 
+
+    std::cout << "End of source function!" << std::endl;
 
 //------------------------------------
 //  CERJAN
 //------------------------------------
 
+    std::cout << "Starting to CERJAN function!" << std::endl;
+
     float *A = createCerjanVector(Nboudary);
 
     float *f = AbsorbingBoudanry(Nboudary, nx_abc, nz_abc, A);
+
+    std::cout << "End of CERJAN function!" << std::endl;
 
 //----------------------------------
 // wavefield
 //----------------------------------
 
+    std::cout << "Starting to wavefield function!" << std::endl;
+
     float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nx_abc, nz_abc, nt, f, Nboudary, sx, sz, Nsource, receivers, nrec); 
+
+    std::cout << "End of wavefield function!" << std::endl;
 
 //---------------------------------------
 // Save binary document of the simulation

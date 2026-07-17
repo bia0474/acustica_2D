@@ -31,7 +31,7 @@ Nboudary = int(parameters["Nboudary"])
 # plot one snap of the simulation
 #----------------------------------
 
-data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
+data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1000.bin", dtype=np.float32)
 
 wavefield = data.reshape((nx, nz))
 
@@ -48,34 +48,45 @@ plt.title("Wavefield Snapshot")
 
 plt.show()
 '''
-#----------------------------------
-# plot the PVxz
-#----------------------------------
+#-------------------------------------------
+# plot the PVxz e the snapshot corresponding
+#------------------------------------------
 
 PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", dtype=np.float32)
 PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", dtype=np.float32)
 
-PVx = PVx.reshape((nx_abc, nz_abc))
-PVz = PVz.reshape((nx_abc, nz_abc))
+data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1000.bin", dtype=np.float32)
 
-x = np.arange(nx_abc) 
-z = np.arange(nz_abc) 
+wavefield = data.reshape((nx, nz))
 
-X, Z = np.meshgrid(z, x)
+PVx = PVx.reshape((nx, nz))
+PVz = PVz.reshape((nx, nz))
 
-step = 20
+x = np.arange(nx) * dx
+z = np.arange(nz) * dz
+
+X, Z = np.meshgrid(x, z, indexing='ij') #indexa a malha igual em C
+
+step = 30
 
 plt.figure(figsize=(8,6))
 
-plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], PVz[::step, ::step], pivot='tail')
+
+plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto")
+
+plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], PVz[::step, ::step], color='black', pivot='mid')
 
 #width: espessura do corpo da seta
 #headwidth: largura da ponta da seta
 #headlength: comprimento da ponta da seta
 
+plt.colorbar(label="Amplitude")
 
-plt.gca().invert_yaxis()
-plt.axis('equal')
+plt.xlabel("x (m)")
+plt.ylabel("z (m)")
+
+plt.title('Snapshot + Vetores de Poynting')
+
 plt.show()
 
 '''
