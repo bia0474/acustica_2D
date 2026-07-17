@@ -593,7 +593,8 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
                 //----------------------------------
 
                 if(n == 1000){
-                    float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i])/(2 * dt);
+
+                    float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i])/dt;
 
                     float Uxx = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i])/(12 * dx);
 
@@ -605,8 +606,8 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
                     float modulo = sqrt(PVx[j * nz_abc + i] * PVx[j * nz_abc + i] + PVz[j * nz_abc + i] * PVz[j * nz_abc + i]);
 
                     Px_unit[j * nz_abc + i] =  PVx[j * nz_abc + i]/modulo;
-                    Pz_unit[j * nz_abc + i] =  PVz[j * nz_abc + i]/modulo;   
-                } 
+                    Pz_unit[j * nz_abc + i] =  PVz[j * nz_abc + i]/modulo;
+                }   
             }
         }
 
@@ -665,32 +666,26 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         
         }    
         */
+
+        //-----------------------------------------------
+        // SAVE ONE SNAPSHOT HERE and PV (binary document)
+        //-----------------------------------------------
+
         if(n == 1000){
 
             std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
-
             std::ofstream file_PVx("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", std::ios::binary);
-
             std::ofstream file_PVz("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", std::ios::binary);
 
             for(int x = Nboudary; x < nx_abc - Nboudary; x++){
 
-            //------------------------------------------
-            // SAVE ONE SNAPSHOT HERE (binary document)
-            //------------------------------------------
+                file.write(reinterpret_cast<char*>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves snaps without the absorbent border
 
-            file.write(reinterpret_cast<char*>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves snaps without the absorbent border
+                file_PVx.write(reinterpret_cast<char*>(&Px_unit[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values
 
-            //---------------------------------------------
-            // SAVE THE PV HERE (binary document)
-            //---------------------------------------------
+                file_PVz.write(reinterpret_cast<char*>(&Pz_unit[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values  
 
-            file_PVx.write(reinterpret_cast<char*>(&Px_unit[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values
-
-            file_PVz.write(reinterpret_cast<char*>(&Pz_unit[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values  
-            
             }
-
             file.close();
             file_PVx.close();
             file_PVz.close();

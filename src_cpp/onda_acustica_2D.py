@@ -74,7 +74,7 @@ plt.figure(figsize=(8,6))
 
 plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto")
 
-plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], PVz[::step, ::step], color='black', pivot='mid')
+plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::step, ::step], color='black', pivot='mid')
 
 #width: espessura do corpo da seta
 #headwidth: largura da ponta da seta
