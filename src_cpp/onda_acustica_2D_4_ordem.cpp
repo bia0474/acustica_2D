@@ -394,65 +394,6 @@ bool checkGeometry(const int *sx, const int *sz, int Nsource, Receiver *receiver
 }
 
 //-------------------------------
-// Cerjan - absorving boudanry
-//-------------------------------
-
-float* AbsorbingBoudanry(int Nboudary, int nx_abc, int nz_abc, const float* A){ //it returns a vector f that will be injected into future and present fields to decrease the energy and consequently the amplitude of the wave
-    
-    float *f = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //matriz of size nx with all values equal to 1 (f(x) = 1 -> withuot cushioning)
-
-    if(f == NULL){ //checks if memory has been allocated
-        return NULL; //null means it's not pointing anywhere
-    }
-
-    #pragma omp parallel for
-    for(int i = 0; i < nx_abc * nz_abc; i++){
-
-        f[i] = 1.0f;
-    }
-
-    #pragma omp parallel for collapse(2)
-    for(int x = 0; x < Nboudary; x++){//Left
-
-        for(int z = 0; z < nz_abc; z++){
-
-            f[x * nz_abc + z] *= A[x];
-        }
-    }
-
-    for(int x = nx_abc - Nboudary; x < nx_abc; x++){//right
-
-        int k = nx_abc - 1 - x;
-
-        for(int z = 0; z < nz_abc; z++){
-
-            f[x * nz_abc + z] *= A[k];
-        }
-    }   
-
-    #pragma omp parallel for collapse(2)
-    for(int z = 0; z < Nboudary; z++){ //Top
-
-        for(int x = 0; x < nx_abc; x++){
-
-            f[x * nz_abc + z] *= A[z];
-        }
-    }
-
-    for(int z = nz_abc - Nboudary; z < nz_abc; z++){
-
-        int k = nz_abc - 1 - z;
-
-        for(int x = 0; x < nx_abc; x++){ //Base
-
-            f[x * nz_abc + z] *= A[k];
-        }
-    }
-
-    return f;
-}
-
-//-------------------------------
 // Cerjan Vector
 //-------------------------------
 
@@ -502,36 +443,20 @@ float* source(float f0, const float* t, int nt){
 // Wave equation
 //----------------------------------
 
-float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nx_abc, int nz_abc, int nt, const float* f, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
+float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nx_abc, int nz_abc, int nt, const float* A, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
 
-    float *u_old = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //passed field
-    float *u_curr = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //present field
-    float *u_next = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //future field
+    float *u_old = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //passed field
+    float *u_curr = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //present field
+    float *u_next = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //future field
 
 //----------------------------------
 // vector of the PV 
 //----------------------------------
 
-    float *PVx = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //vector d2P/dx2
-    float *PVz = (float*) malloc(nx_abc * nz_abc * sizeof(float)); //vector d2P/dz2
-    float *Px_unit = (float*) malloc(nx_abc * nz_abc * sizeof(float)); 
-    float *Pz_unit = (float*) malloc(nx_abc * nz_abc * sizeof(float));
-
-//----------------------------------
-// inicialization of vectors
-//----------------------------------
-
-    #pragma omp parallel for
-    for(int i = 0; i < nx_abc * nz_abc; i++){ //inicialization
-
-        u_old[i] = 0.0f;
-        u_curr[i] = 0.0f;
-        u_next[i] = 0.0f;
-        PVx[i] = 0.0f;
-        PVz[i] = 0.0f;
-        Px_unit[i] = 0.0f;
-        Pz_unit[i] = 0.0f;
-    }
+    float *PVx = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //vector d2P/dx2
+    float *PVz = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //vector d2P/dz2
+    //float *Px_unit = (float*) calloc(nx_abc * nz_abc, sizeof(float)); 
+    //float *Pz_unit = (float*) calloc(nx_abc * nz_abc, sizeof(float));
 
 //----------------------------------
 // Courant number for speeds
@@ -553,13 +478,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 //----------------------------------
     //stores seismic traces (nrec x nt)
 
-    float *seismogram = (float*) malloc(nrec * nt * sizeof(float));
-
-    #pragma omp parallel for
-    for(int i = 0; i < nrec * nt; i++){ //inicialization
-
-        seismogram[i] = 0.0f;
-    }
+    float *seismogram = (float*) calloc(nrec * nt, sizeof(float));
 
 //----------------------------------
 // time loop - 2nd order
@@ -601,10 +520,10 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
                 PVx[j * nz_abc + i] = - dUdt * Uxx;
                 PVz[j * nz_abc + i] = - dUdt * Uzz;
 
-                float modulo = sqrt(PVx[j * nz_abc + i] * PVx[j * nz_abc + i] + PVz[j * nz_abc + i] * PVz[j * nz_abc + i]);
+                //float modulo = sqrt(PVx[j * nz_abc + i] * PVx[j * nz_abc + i] + PVz[j * nz_abc + i] * PVz[j * nz_abc + i]);
 
-                Px_unit[j * nz_abc + i] =  PVx[j * nz_abc + i]/modulo;
-                Pz_unit[j * nz_abc + i] =  PVz[j * nz_abc + i]/modulo;
+                //Px_unit[j * nz_abc + i] =  PVx[j * nz_abc + i]/modulo;
+                //Pz_unit[j * nz_abc + i] =  PVz[j * nz_abc + i]/modulo;
             }
         }
 
@@ -620,17 +539,49 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         //----------------------------------
         // CERJAN
         //----------------------------------
-        
+
         #pragma omp parallel for collapse(2)
-        for(int j = 0; j < nx_abc; j++){ //The amplitude of each field at each point gradually decreases
+        for(int x = 0; x < Nboudary; x++){//Left
 
-            for(int i = 0; i < nz_abc; i++){
+            for(int z = 0; z < nz_abc; z++){
 
-                u_next[j * nz_abc + i] *= f[j * nz_abc + i];
-                u_curr[j * nz_abc + i] *= f[j * nz_abc + i];
+                u_next[x * nz_abc + z] *= A[x];
+                u_curr[x * nz_abc + z] *= A[x];
             }
         }
-        
+
+        for(int x = nx_abc - Nboudary; x < nx_abc; x++){//right
+
+            int k = nx_abc - 1 - x;
+
+            for(int z = 0; z < nz_abc; z++){
+
+                u_next[x * nz_abc + z] *= A[k];
+                u_curr[x * nz_abc + z] *= A[k];
+            }
+        }   
+
+        #pragma omp parallel for collapse(2)
+        for(int z = 0; z < Nboudary; z++){ //Top
+
+            for(int x = 0; x < nx_abc; x++){
+
+                u_next[x * nz_abc + z] *= A[z];
+                u_curr[x * nz_abc + z] *= A[z];
+            }
+        }
+
+        for(int z = nz_abc - Nboudary; z < nz_abc; z++){
+
+            int k = nz_abc - 1 - z;
+
+            for(int x = 0; x < nx_abc; x++){ //Base
+
+                u_next[x * nz_abc + z] *= A[k];
+                u_curr[x * nz_abc + z] *= A[k];
+            }
+        }
+
         //----------------------------------
         // save the receiver
         //----------------------------------
@@ -658,9 +609,9 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
                 file.write(reinterpret_cast<char*>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves snaps without the absorbent border
                 
-                file_PVx.write(reinterpret_cast<char*>(&Px_unit[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values
+                file_PVx.write(reinterpret_cast<char*>(&PVx[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values
 
-                file_PVz.write(reinterpret_cast<char*>(&Pz_unit[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values  
+                file_PVz.write(reinterpret_cast<char*>(&PVz[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values  
             }
 
             file.close();
@@ -815,8 +766,6 @@ int main(){
 
     float *A = createCerjanVector(Nboudary);
 
-    float *f = AbsorbingBoudanry(Nboudary, nx_abc, nz_abc, A);
-
     std::cout << "End of CERJAN function!" << std::endl;
 
 //----------------------------------
@@ -825,7 +774,7 @@ int main(){
 
     std::cout << "Starting to wavefield function!" << std::endl;
 
-    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nx_abc, nz_abc, nt, f, Nboudary, sx, sz, Nsource, receivers, nrec); 
+    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nx_abc, nz_abc, nt, A, Nboudary, sx, sz, Nsource, receivers, nrec); 
 
     std::cout << "End of wavefield function!" << std::endl;
 
@@ -842,7 +791,6 @@ int main(){
     std::cout << "Wavefield binary file saved!" << std::endl;
 
     free(wavefield);
-    free(f);
     free(A);
     free(fonte);
     free(c);

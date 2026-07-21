@@ -26,7 +26,7 @@ dt = float(parameters["dt"])
 
 nrec = int(parameters["nrec"])
 Nboudary = int(parameters["Nboudary"])
-'''
+
 #----------------------------------
 # plot one snap of the simulation
 #----------------------------------
@@ -37,7 +37,7 @@ wavefield = data.reshape((nx, nz))
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto")
+plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
 
 plt.colorbar(label="Amplitude")
 
@@ -47,7 +47,7 @@ plt.ylabel("z (m)")
 plt.title("Wavefield Snapshot")
 
 plt.show()
-
+'''
 #----------------------------------
 # plot the PVxz
 #----------------------------------
@@ -75,13 +75,12 @@ plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::ste
 
 plt.show()
 '''
-'''
 #-------------------------------------------
 # plot the PVxz e the snapshot corresponding
 #------------------------------------------
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", dtype=np.float32)
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", dtype=np.float32)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX1000.bin", dtype=np.float32)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ1000.bin", dtype=np.float32)
 
 data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1000.bin", dtype=np.float32)
 
@@ -100,15 +99,15 @@ step = 30
 plt.figure(figsize=(8,6))
 
 
-plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto")
+img = plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
 
-plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::step, ::step], color='black', pivot='mid')
+plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::step, ::step], color='black', pivot='tail', scale=80)
 
 #width: espessura do corpo da seta
 #headwidth: largura da ponta da seta
 #headlength: comprimento da ponta da seta
 
-plt.colorbar(label="Amplitude")
+plt.colorbar(img, label="Amplitude")
 
 plt.xlabel("x (m)")
 plt.ylabel("z (m)")
@@ -116,13 +115,13 @@ plt.ylabel("z (m)")
 plt.title('Snapshot + Vetores de Poynting')
 
 plt.show()
-'''
+
 #-------------------------------------------
 # animation with Poynting vectors
 #------------------------------------------
 fig, ax = plt.subplots(figsize=(8,6))
 
-step = 50
+step = 20
 
 x = np.arange(nx) * dx
 z = np.arange(nz) * dz
@@ -136,9 +135,9 @@ PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirecti
 
 PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ250.bin",dtype=np.float32).reshape(nx,nz)
 
-img = ax.imshow(wave.T, cmap="jet", origin="upper", extent=[0,nx*dx,nz*dz,0])
+img = ax.imshow(wave.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], aspect="auto")
 
-quiv = ax.quiver(X[::step,::step], Z[::step,::step], PVx[::step,::step], -PVz[::step,::step], color="black",pivot="mid")
+quiv = ax.quiver(X[::step,::step], Z[::step,::step], PVx[::step,::step], -PVz[::step,::step], color="black",pivot="tail", scale=110)
 
 def update(n):
 
@@ -154,11 +153,13 @@ def update(n):
 
     return img, quiv
 
-ani = animation.FuncAnimation(fig, update, frames=range(250, 3900, 250), interval=200, blit=True)
+ani = animation.FuncAnimation(fig, update, frames=range(250, 3900, 250), interval=300, blit=True)
+
+plt.colorbar(img, label="Amplitude")
 
 plt.show()
 
-'''
+
 #----------------------------------
 # animatiom 1D acustic wave
 #----------------------------------
@@ -168,9 +169,9 @@ fig, ax = plt.subplots(figsize=(8,6))
 first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
 first = first.reshape((nx, nz))
 
-img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx*dx, nz*dz, 0], aspect="auto", animated=True)
+img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto", animated=True)
 
-plt.colorbar(img)
+plt.colorbar(img, label="Amplitude")
 
 ax.set_xlabel("x (m)")
 ax.set_ylabel("z (m)")
@@ -187,7 +188,7 @@ def update(frame):
 
     return [img]
 
-frames = range(100, 3900, 100)
+frames = range(250, 3750, 250)
 
 ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
 
@@ -236,4 +237,4 @@ plt.title("Seismogram")
 plt.colorbar()
 
 plt.show()
-'''
+
