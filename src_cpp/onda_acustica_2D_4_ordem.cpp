@@ -445,7 +445,6 @@ float* source(float f0, const float* t, int nt){
 
 float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int nx, int nz, int nx_abc, int nz_abc, int nt, const float* A, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec){
 
-    float *u_old = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //passed field
     float *u_curr = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //present field
     float *u_next = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //future field
 
@@ -457,6 +456,20 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     float *PVz = (float*) calloc(nx_abc * nz_abc, sizeof(float)); //vector d2P/dz2
     //float *Px_unit = (float*) calloc(nx_abc * nz_abc, sizeof(float)); 
     //float *Pz_unit = (float*) calloc(nx_abc * nz_abc, sizeof(float));
+
+/* 
+//----------------------------------
+// Optical Flow
+//----------------------------------
+
+    float *px = (float*) calloc(nx_abc * nz_abc, sizeof(float));
+    float *pz = (float*) calloc(nx_abc * nz_abc, sizeof(float));
+    float *pt = (float*) calloc(nx_abc * nz_abc, sizeof(float));
+
+    float *ux = (float*) calloc(nx_abc * nz_abc, sizeof(float));
+    float *uz = (float*) calloc(nx_abc * nz_abc, sizeof(float));
+   
+*/
 
 //----------------------------------
 // Courant number for speeds
@@ -526,6 +539,43 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
                 //Px_unit[j * nz_abc + i] =  PVx[j * nz_abc + i]/modulo;
                 //Pz_unit[j * nz_abc + i] =  PVz[j * nz_abc + i]/modulo;
+
+                /*
+                //----------------------------------
+                // Using Optical Flow method
+                //----------------------------------
+
+                px[j * nz_abc + i] = Ux;
+                pz[j * nz_abc + i] = Uz;
+                pt[j * nz_abc + i] = dUdt; 
+
+                int n_iter_of = 20;
+                float alpha = 1.0f;
+
+                float somaux = 0.0f;
+                float somauz = 0.0f;
+
+                for (int iter = 0; iter < n_iter_of; iter++) {
+                    
+                    //somatorios
+
+                    for(int a = -1; a < -1; a++){
+                        for(int b = -1; b < -1; b++){
+
+                            somaux += ux[(j + a) * nz_abc + (i + b)];
+                            somauz += uz[(j + a) * nz_abc + (i + b)];
+                        }
+                    }
+
+                    float ux_average = (1.0f/12.0f) * (ux[(j - 1) * nz_abc + i] + ux[(j + 1) * nz_abc + i] + ux[j * nz_abc + (i - 1)] + ux[j * nz_abc + (i + 1)] - ux[j * nz_abc + i] + somaux);
+                    float uz_average = (1.0f/12.0f) * (uz[(j - 1) * nz_abc + i] + uz[(j + 1) * nz_abc + i] + uz[j * nz_abc + (i - 1)] + uz[j * nz_abc + (i + 1)] - uz[j * nz_abc + i] + somauz);
+
+                    float denominator = alpha * alpha + px[j * nz_abc + i] * px[j * nz_abc + i] + pz[j * nz_abc + i] * pz[j * nz_abc + i];
+
+                    ux[j * nz_abc + i] = ux_average - (px[j * nz_abc + i] * (px[j * nz_abc + i] * ux_average + pz[j * nz_abc + i] * uz_average + pt[j * nz_abc + i])/(denominator));
+                    uz[j * nz_abc + i] = uz_average - (pz[j * nz_abc + i] * (px[j * nz_abc + i] * ux_average + pz[j * nz_abc + i] * uz_average + pt[j * nz_abc + i])/(denominator));    
+                }
+                */
             }
         }
 
@@ -613,8 +663,12 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         if(n % 250 == 0){
 
             std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
+
             std::ofstream file_PVx("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX" + std::to_string(n) + ".bin", std::ios::binary);
             std::ofstream file_PVz("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ" + std::to_string(n) + ".bin", std::ios::binary);
+
+            //std::ofstream file_PVxOF("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx" + std::to_string(n) + ".bin", std::ios::binary);
+            //std::ofstream file_PVzOF("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz" + std::to_string(n) + ".bin", std::ios::binary);
 
             for(int x = Nboudary; x < nx_abc - Nboudary; x++){
 
@@ -623,12 +677,17 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
                 file_PVx.write(reinterpret_cast<char*>(&PVx[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values
 
                 file_PVz.write(reinterpret_cast<char*>(&PVz[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values  
+
+                //file_PVxOF.write(reinterpret_cast<char*>(&ux[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values
+
+                //file_PVzOF.write(reinterpret_cast<char*>(&uz[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); //saves PV values  
             }
 
             file.close();
             file_PVx.close();
             file_PVz.close();
-        
+            //file_PVxOF.close();
+            //file_PVzOF.close();       
         }    
 
         //----------------------------------
@@ -664,7 +723,6 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     }
 
     free(e);
-    free(u_old);
     free(u_curr);
     free(u_next);
     free(seismogram);
