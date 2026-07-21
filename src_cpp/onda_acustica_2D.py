@@ -47,13 +47,13 @@ plt.ylabel("z (m)")
 plt.title("Wavefield Snapshot")
 
 plt.show()
-'''
+
 #----------------------------------
 # plot the PVxz
 #----------------------------------
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX.bin", dtype=np.float32)
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ.bin", dtype=np.float32)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX1000.bin", dtype=np.float32)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ1000.bin", dtype=np.float32)
 
 PVx = PVx.reshape((nx, nz))
 PVz = PVz.reshape((nx, nz))
@@ -67,14 +67,14 @@ step = 20
 
 plt.figure(figsize=(8,6))
 
-plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::step, ::step], color='black', pivot='mid')
+plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::step, ::step], color='black', pivot='tail', scale=80)
 
 #width: espessura do corpo da seta
 #headwidth: largura da ponta da seta
 #headlength: comprimento da ponta da seta
 
 plt.show()
-'''
+
 #-------------------------------------------
 # plot the PVxz e the snapshot corresponding
 #------------------------------------------
@@ -94,14 +94,14 @@ z = np.arange(nz) * dz
 
 X, Z = np.meshgrid(x, z, indexing='ij') #indexa a malha igual em C
 
-step = 30
+step = 50
 
 plt.figure(figsize=(8,6))
 
 
 img = plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
 
-plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::step, ::step], color='black', pivot='tail', scale=80)
+plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::step, ::step], color='black', pivot='tail', scale=100)
 
 #width: espessura do corpo da seta
 #headwidth: largura da ponta da seta

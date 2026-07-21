@@ -462,7 +462,9 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 // Courant number for speeds
 //----------------------------------
 
-   float *e = (float*) malloc(nx_abc * nz_abc * sizeof(float));
+    std::cout << "Making the calculos of Courant number!" << std::endl;
+
+    float *e = (float*) malloc(nx_abc * nz_abc * sizeof(float));
 
     #pragma omp parallel for collapse(2) schedule(static)
     for(int i = 0; i < nx_abc; i++){ 
@@ -484,9 +486,9 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 // time loop - 2nd order
 //----------------------------------
 
-    for(int n = 1; n < nt; n++){ //each iteration calculates the wave at the next instant
+    std::cout << "Starting the temporal and spacial loops!" << std::endl;
 
-        std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f); //resets the futures field before the next calculation
+    for(int n = 1; n < nt; n++){ //each iteration calculates the wave at the next instant
 
         //----------------------------------
         // space loop - 4nd order
@@ -505,7 +507,7 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
                 float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i-1)] - u_curr[j * nz_abc + (i - 2)])/(12 * dz * dz);
 
-                u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_old[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
+                u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
 
                 //----------------------------------
                 // Poynting vectors
@@ -513,12 +515,12 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
 
                 float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i])/dt;
 
-                float Uxx = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i])/(12 * dx);
+                float Ux = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i])/(12 * dx);
 
-                float Uzz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)])/(12 * dz);
+                float Uz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)])/(12 * dz);
 
-                PVx[j * nz_abc + i] = - dUdt * Uxx;
-                PVz[j * nz_abc + i] = - dUdt * Uzz;
+                PVx[j * nz_abc + i] = - dUdt * Ux;
+                PVz[j * nz_abc + i] = - dUdt * Uz;
 
                 //float modulo = sqrt(PVx[j * nz_abc + i] * PVx[j * nz_abc + i] + PVz[j * nz_abc + i] * PVz[j * nz_abc + i]);
 
@@ -539,6 +541,10 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         //----------------------------------
         // CERJAN
         //----------------------------------
+
+        if(n == 1){
+            std::cout << "Making the CERJAN boudary" << std::endl;
+        }
 
         #pragma omp parallel for collapse(2)
         for(int x = 0; x < Nboudary; x++){//Left
@@ -599,7 +605,12 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         //-------------------------------------------------------
         // SAVE ALL THE SNAPSHOT HERE WITH PVxz (binary document)
         //-------------------------------------------------------
-         if(n % 250 == 0){
+
+        if(n == 1){
+            std::cout << "Saving the file of the snapshots and PVs!" << std::endl;
+        }
+
+        if(n % 250 == 0){
 
             std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
             std::ofstream file_PVx("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX" + std::to_string(n) + ".bin", std::ios::binary);
@@ -623,17 +634,15 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
         //----------------------------------
         // advance in time
         //----------------------------------
-
-        float *tmp = u_old; //temporary pointer to save the memory adress of u_old
-
-        u_old = u_curr;
-        u_curr = u_next;
-        u_next = tmp;
+        
+        std::swap(u_curr, u_next);
     }
 
     //-----------------------------------
     // SAVE THE DOCUMENT OF THE SISMOGRAM
     //-----------------------------------
+
+    std::cout << "Saving the seismogram binary file!" << std::endl;
 
     std::ofstream file("/home/processamento/acustica_2D/outputs/seismogram.bin", std::ios::binary);
 
@@ -642,7 +651,6 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     file.close();
 
     std::cout << "Seismogram binary file saved!" << std::endl;
-    std::cout << "Snapshot binary file saved!" << std::endl;
 
     //-----------------------------------
     // SAVE the copy of the final field
@@ -697,31 +705,26 @@ int main(){
     float *z = NULL;
     float *t = NULL;
 
-    std::cout << "Starting to read the parameters!" << std::endl;
+    std::cout << "Reading the document of the parameters!" << std::endl;
 
     readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx, &nz, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
 
-    std::cout << "End of parameter reading!" << std::endl;
 
 //----------------------------------
 // open the document of RECEIVERS
 //----------------------------------
 
-    std::cout << "Starting to read the receivers!" << std::endl;
+    std::cout << "Reading the document of the receivers!" << std::endl;
 
     Receiver *receivers = readReceivers(receivers_file, nrec, Nboudary);
-
-    std::cout << "End of receiver reading!" << std::endl;
 
 //-----------------------------------------
 // open the document of the VELOCITY MODEL
 //-----------------------------------------
 
-    std::cout << "Starting to read the velocity model!" << std::endl;
+    std::cout << "Reading the document of the velocity model!" << std::endl;
 
     float *c = readVelocity("/home/processamento/acustica_2D/src_cpp/Vp_camadas_501x501.bin", nx, nz, nx_abc, nz_abc, Nboudary);
-
-    std::cout << "End of velocity model reading!" << std::endl;
 
 //------------------------------------------
 // open the document of the SOURCE
@@ -730,23 +733,19 @@ int main(){
     int *sx = NULL;
     int *sz = NULL;
 
-    std::cout << "Starting to read the sources!" << std::endl;
+    std::cout << "Reading the document of the sources!" << std::endl;
 
     readSources(sources_file, Nsource, &sx, &sz, Nboudary);
-
-    std::cout << "End of source reading!" << std::endl;
 
 //----------------------------------
 // check geometry 
 //----------------------------------
 
-    std::cout << "Starting to check the geometry!" << std::endl;
+    std::cout << "Cheking the geometry!" << std::endl;
 
     if (!checkGeometry(sx, sz, Nsource, receivers, nrec, nx, nz, Nboudary)){
         return 1;
     }
-
-    std::cout << "End of check geometry!" << std::endl;
 
 //-----------------------------------------
 // call the source fuction
@@ -756,8 +755,6 @@ int main(){
 
     float *fonte = source(f0, t, nt); 
 
-    std::cout << "End of source function!" << std::endl;
-
 //------------------------------------
 //  CERJAN
 //------------------------------------
@@ -766,8 +763,6 @@ int main(){
 
     float *A = createCerjanVector(Nboudary);
 
-    std::cout << "End of CERJAN function!" << std::endl;
-
 //----------------------------------
 // wavefield
 //----------------------------------
@@ -775,8 +770,6 @@ int main(){
     std::cout << "Starting to wavefield function!" << std::endl;
 
     float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nx_abc, nz_abc, nt, A, Nboudary, sx, sz, Nsource, receivers, nrec); 
-
-    std::cout << "End of wavefield function!" << std::endl;
 
 //---------------------------------------
 // Save binary document of the simulation
