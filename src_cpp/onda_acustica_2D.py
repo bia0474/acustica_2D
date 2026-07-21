@@ -52,8 +52,8 @@ plt.show()
 # plot the PVxz
 #----------------------------------
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx1000.bin", dtype=np.float32)
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz1000.bin", dtype=np.float32)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX1000.bin", dtype=np.float32)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ1000.bin", dtype=np.float32)
 
 PVx = PVx.reshape((nx, nz))
 PVz = PVz.reshape((nx, nz))
@@ -79,8 +79,8 @@ plt.show()
 # plot the PVxz e the snapshot corresponding
 #------------------------------------------
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx1000.bin", dtype=np.float32)
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz1000.bin", dtype=np.float32)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX1000.bin", dtype=np.float32)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ1000.bin", dtype=np.float32)
 
 data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1000.bin", dtype=np.float32)
 
@@ -131,9 +131,9 @@ X, Z = np.meshgrid(x, z, indexing="ij")
 # primeiro frame
 wave = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_250.bin", dtype=np.float32).reshape(nx,nz)
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx250.bin", dtype=np.float32).reshape(nx,nz)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX250.bin", dtype=np.float32).reshape(nx,nz)
 
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz250.bin",dtype=np.float32).reshape(nx,nz)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ250.bin",dtype=np.float32).reshape(nx,nz)
 
 img = ax.imshow(wave.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], aspect="auto")
 
@@ -143,9 +143,9 @@ def update(n):
 
     wave = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_{n}.bin", dtype=np.float32).reshape(nx,nz)
 
-    PVx = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorOFx{n}.bin", dtype=np.float32).reshape(nx,nz)
+    PVx = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX{n}.bin", dtype=np.float32).reshape(nx,nz)
 
-    PVz = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorOFz{n}.bin", dtype=np.float32).reshape(nx,nz)
+    PVz = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ{n}.bin", dtype=np.float32).reshape(nx,nz)
 
     img.set_data(wave.T)
 

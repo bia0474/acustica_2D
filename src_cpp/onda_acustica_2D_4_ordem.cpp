@@ -726,6 +726,15 @@ float* derivates(float *c, float dt, float dx, float dz, const float* fonte, int
     free(u_curr);
     free(u_next);
     free(seismogram);
+    free(PVx);
+    free(PVz);
+    //free(px);
+    //free(pz);
+    //free(pt);
+    //free(ux);
+    //free(uz);
+    //free(Px_unit);
+    //free(Pz_unit);
 
     return result;
 }
