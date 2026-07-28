@@ -27,11 +27,12 @@ dt = float(parameters["dt"])
 nrec = int(parameters["nrec"])
 Nboudary = int(parameters["Nboudary"])
 
+'''
 #----------------------------------
 # plot one snap of the simulation
 #----------------------------------
 
-data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1000.bin", dtype=np.float32)
+data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_2500.bin", dtype=np.float32)
 
 wavefield = data.reshape((nx, nz))
 
@@ -52,8 +53,11 @@ plt.show()
 # plot the PVxz
 #----------------------------------
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX1000.bin", dtype=np.float32)
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ1000.bin", dtype=np.float32)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx2500.bin", dtype=np.float32)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz2500.bin", dtype=np.float32)
+
+#PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX2500.bin", dtype=np.float32)
+#PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ2500.bin", dtype=np.float32)
 
 PVx = PVx.reshape((nx, nz))
 PVz = PVz.reshape((nx, nz))
@@ -74,54 +78,76 @@ plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::ste
 #headlength: comprimento da ponta da seta
 
 plt.show()
+'''
+#-------------------------------------------------------
+# plot the PVxz and PVOFxz to the snapshot corresponding
+#-------------------------------------------------------
 
-#-------------------------------------------
-# plot the PVxz e the snapshot corresponding
-#------------------------------------------
+PVx_of = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx2500.bin", dtype=np.float32).reshape((nx, nz))
+PVz_of = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz2500.bin", dtype=np.float32).reshape((nx, nz))
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX1000.bin", dtype=np.float32)
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ1000.bin", dtype=np.float32)
+PVx_pv = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX2500.bin", dtype=np.float32).reshape((nx, nz))
+PVz_pv = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ2500.bin", dtype=np.float32).reshape((nx, nz))
 
-data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1000.bin", dtype=np.float32)
-
-wavefield = data.reshape((nx, nz))
-
-PVx = PVx.reshape((nx, nz))
-PVz = PVz.reshape((nx, nz))
+wavefield = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_2500.bin", dtype=np.float32).reshape((nx, nz))
 
 x = np.arange(nx) * dx
 z = np.arange(nz) * dz
+X, Z = np.meshgrid(x, z, indexing='ij')
 
-X, Z = np.meshgrid(x, z, indexing='ij') #indexa a malha igual em C
+step = 30  # menos denso
 
-step = 50
+#-------------------------------------------
+# função de plotagem com cor por direção
+#-------------------------------------------
 
-plt.figure(figsize=(8,6))
+def plot_panel(ax, Vx, Vz, title):
+    ax.imshow(wavefield.T, cmap="gray", origin="upper", extent=[0, nx*dx, nz*dz, 0], interpolation="bilinear", aspect="auto")
 
+    Xs = X[::step, ::step]
+    Zs = Z[::step, ::step]
 
-img = plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
+    Vx_s = Vx[::step, ::step]
+    Vz_s = Vz[::step, ::step]
 
-plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::step, ::step], color='black', pivot='tail', scale=100)
+    # --- normalização para vetor unitário ---
+    norm = np.sqrt(Vx_s**2 + Vz_s**2)
+    norm[norm == 0] = np.nan  # evita divisão por zero; NaN faz o quiver ignorar essas setas
 
-#width: espessura do corpo da seta
-#headwidth: largura da ponta da seta
-#headlength: comprimento da ponta da seta
+    Vxs = Vx_s / norm
+    Vzs = -Vz_s / norm  # mesmo sinal invertido que você já usava
 
-plt.colorbar(img, label="Amplitude")
+    # separa por direção: vermelho = descendo (Vz>0 no eixo original), verde = subindo
+    mask_down = Vz_s > 0
+    mask_up   = ~mask_down
 
-plt.xlabel("x (m)")
-plt.ylabel("z (m)")
+    ax.quiver(Xs[mask_down], Zs[mask_down], Vxs[mask_down], Vzs[mask_down], color='red', pivot='mid', scale=40, width=0.003)
+    ax.quiver(Xs[mask_up], Zs[mask_up], Vxs[mask_up], Vzs[mask_up], color='lime', pivot='mid', scale=40, width=0.003)
 
-plt.title('Snapshot + Vetores de Poynting')
+    ax.set_title(title)
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("z (m)")
+
+#-------------------------------------------
+# figura com 2 painéis
+#-------------------------------------------
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+plot_panel(axes[0], PVx_pv, PVz_pv, "(a) Poynting vector (Yoon & Marfurt)")
+plot_panel(axes[1], PVx_of, PVz_of, "(b) Optical flow (Horn-Schunck)")
+
+plt.tight_layout()
 
 plt.show()
 
+'''
 #-------------------------------------------
 # animation with Poynting vectors
 #------------------------------------------
 fig, ax = plt.subplots(figsize=(8,6))
 
-step = 20
+step = 8
 
 x = np.arange(nx) * dx
 z = np.arange(nz) * dz
@@ -131,13 +157,17 @@ X, Z = np.meshgrid(x, z, indexing="ij")
 # primeiro frame
 wave = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_250.bin", dtype=np.float32).reshape(nx,nz)
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX250.bin", dtype=np.float32).reshape(nx,nz)
+#PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX250.bin", dtype=np.float32).reshape(nx,nz)
 
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ250.bin",dtype=np.float32).reshape(nx,nz)
+#PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ250.bin",dtype=np.float32).reshape(nx,nz)
 
-img = ax.imshow(wave.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], aspect="auto")
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx250.bin", dtype=np.float32)
 
-quiv = ax.quiver(X[::step,::step], Z[::step,::step], PVx[::step,::step], -PVz[::step,::step], color="black",pivot="tail", scale=110)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz250.bin", dtype=np.float32)
+
+img = ax.imshow(wave.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], interpolation="bilinear", aspect="auto")
+
+quiv = ax.quiver(X[::step,::step], Z[::step,::step], PVx[::step,::step], -PVz[::step,::step], color="black", pivot="mid", scale=30, width=0.003)
 
 def update(n):
 
@@ -146,6 +176,10 @@ def update(n):
     PVx = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX{n}.bin", dtype=np.float32).reshape(nx,nz)
 
     PVz = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ{n}.bin", dtype=np.float32).reshape(nx,nz)
+
+    PVx = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorOFx{n}.bin", dtype=np.float32).reshape(nx,nz)
+    
+    PVz = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorOFz{n}.bin", dtype=np.float32).reshape(nx,nz)
 
     img.set_data(wave.T)
 
@@ -166,7 +200,7 @@ plt.show()
 
 fig, ax = plt.subplots(figsize=(8,6))
 
-first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
+first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_2500.bin", dtype=np.float32)
 first = first.reshape((nx, nz))
 
 img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto", animated=True)
@@ -188,7 +222,7 @@ def update(frame):
 
     return [img]
 
-frames = range(250, 3750, 250)
+frames = range(250, 32500, 250)
 
 ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
 
@@ -238,3 +272,4 @@ plt.colorbar()
 
 plt.show()
 
+'''
