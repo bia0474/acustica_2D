@@ -32,7 +32,7 @@ Nboudary = int(parameters["Nboudary"])
 # plot one snap of the simulation
 #----------------------------------
 
-data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_2500.bin", dtype=np.float32)
+data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1500.bin", dtype=np.float32)
 
 wavefield = data.reshape((nx, nz))
 
@@ -53,11 +53,11 @@ plt.show()
 # plot the PVxz
 #----------------------------------
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx2500.bin", dtype=np.float32)
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz2500.bin", dtype=np.float32)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx1500.bin", dtype=np.float32)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz1500.bin", dtype=np.float32)
 
-#PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX2500.bin", dtype=np.float32)
-#PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ2500.bin", dtype=np.float32)
+#PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX1500.bin", dtype=np.float32)
+#PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ1500.bin", dtype=np.float32)
 
 PVx = PVx.reshape((nx, nz))
 PVz = PVz.reshape((nx, nz))
@@ -83,13 +83,13 @@ plt.show()
 # plot the PVxz and PVOFxz to the snapshot corresponding
 #-------------------------------------------------------
 
-PVx_of = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx2500.bin", dtype=np.float32).reshape((nx, nz))
-PVz_of = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz2500.bin", dtype=np.float32).reshape((nx, nz))
+PVx_of = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx1500.bin", dtype=np.float32).reshape((nx, nz))
+PVz_of = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz1500.bin", dtype=np.float32).reshape((nx, nz))
 
-PVx_pv = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX2500.bin", dtype=np.float32).reshape((nx, nz))
-PVz_pv = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ2500.bin", dtype=np.float32).reshape((nx, nz))
+PVx_pv = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX1500.bin", dtype=np.float32).reshape((nx, nz))
+PVz_pv = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ1500.bin", dtype=np.float32).reshape((nx, nz))
 
-wavefield = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_2500.bin", dtype=np.float32).reshape((nx, nz))
+wavefield = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1500.bin", dtype=np.float32).reshape((nx, nz))
 
 x = np.arange(nx) * dx
 z = np.arange(nz) * dz
@@ -200,7 +200,7 @@ plt.show()
 
 fig, ax = plt.subplots(figsize=(8,6))
 
-first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_2500.bin", dtype=np.float32)
+first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1500.bin", dtype=np.float32)
 first = first.reshape((nx, nz))
 
 img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto", animated=True)
@@ -222,17 +222,40 @@ def update(frame):
 
     return [img]
 
-frames = range(250, 32500, 250)
+frames = range(250, 31500, 250)
 
 ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
 
 plt.show()
+'''
 
+#----------------------------------
+# velocity model marmousi Juan
+#----------------------------------
+
+vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/vp_marmousi-ii_shape_(2801, 13601)_dh10m_Nz351_Nx851.bin", dtype=np.float32)
+
+vel = vel.reshape((nz, nx))
+
+plt.figure(figsize=(8,6))
+
+plt.imshow(vel, origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
+
+plt.colorbar(label="Velocity (m/s)")
+
+plt.xlabel("x (m)")
+plt.ylabel("z (m)")
+
+plt.title("Velocity Model")
+
+plt.show()
+
+'''
 #----------------------------------
 # velocity model
 #----------------------------------
 
-vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/Vp_camadas_501x501.bin", dtype=np.float32)
+vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/vp_marmousi-ii_shape_(2801, 13601)_dh25m_Nz141_Nx681.bin", dtype=np.float32)
 
 vel = vel.reshape((nx, nz))
 

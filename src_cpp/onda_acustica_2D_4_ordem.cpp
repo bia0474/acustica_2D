@@ -221,7 +221,7 @@ void readSources(const char *sources_file, int Nsource, int **sx, int **sz, int 
 }
 
 //---------------------------------------
-// read velocity model by Yuri (function)
+// read velocity model (function)
 //---------------------------------------
 
 float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int nz_abc, int Nboudary)
@@ -235,11 +235,27 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
         exit(1);
     }
 
-    float *c = (float *)malloc(nx * nz * sizeof(float));
+    // Lê no formato como está salvo: nz x nx (linha = z fixo, todas as posições x)
+    float *c_raw = (float *)malloc(nx * nz * sizeof(float));
 
-    fread(c, sizeof(float), nx * nz, file);
+    fread(c_raw, sizeof(float), nx * nz, file);
 
     fclose(file);
+
+    // Transpõe para o formato que o resto do código espera: nx x nz
+    float *c = (float *)malloc(nx * nz * sizeof(float));
+
+    for (int i = 0; i < nx; i++)
+    {
+        for (int j = 0; j < nz; j++)
+        {
+            // c_raw está em ordem (nz, nx): índice = j * nx + i
+            // c deve ficar em ordem (nx, nz): índice = i * nz + j
+            c[i * nz + j] = c_raw[j * nx + i];
+        }
+    }
+
+    free(c_raw);
 
     float *c_exp = (float *)calloc(nx_abc * nz_abc, sizeof(float));
 
@@ -565,7 +581,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         //----------------------------------
         // space loop - 4nd order
         //----------------------------------
-        clock_t inicio = clock();
 
         #pragma omp parallel for collapse(2) schedule(static)
         for (int j = 2; j < nx_abc - 2; j++)
@@ -614,13 +629,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         //---------------------------------------------------------------
         // Using Optical Flow method (20 iterations over the entire mesh)
         //---------------------------------------------------------------
-
-        //----------------------------------------------------
-        // Optical Flow (Horn-Schunck) — só roda no timestep
-        // que será salvo, e sempre reiniciando ux/uz do zero
-        // para representar o fluxo LOCAL daquele instante,
-        // sem acúmulo entre snapshots.
-        //----------------------------------------------------
 
         if (n % 500 == 0)
         {
@@ -671,9 +679,9 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             u_next[sx[k] * nz_abc + sz[k]] += fonte[n];
         }
 
-        //------------------------------------------
-        // CERJAN (source field + ux and uz from OF)
-        //------------------------------------------
+        //-----------------------------------
+        // CERJAN 
+        //-----------------------------------
 
         if (n == 1)
         {
@@ -750,7 +758,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         if (n == 1)
         {
-            std::cout << "Saving the file of the snapshots and PVs!" << std::endl;
+            std::cout << "Saving the file of the snapshots, PVs and PVOFs!" << std::endl;
         }
 
         if (n % 500 == 0)
@@ -885,7 +893,7 @@ int main()
 
     std::cout << "Reading the document of the velocity model!" << std::endl;
 
-    float *c = readVelocity("/home/processamento/acustica_2D/src_cpp/Vp_camadas_501x501.bin", nx, nz, nx_abc, nz_abc, Nboudary);
+    float *c = readVelocity("/home/processamento/acustica_2D/src_cpp/vp_marmousi-ii_shape_(2801, 13601)_dh10m_Nz351_Nx851.bin", nx, nz, nx_abc, nz_abc, Nboudary);
 
     //------------------------------------------
     // open the document of the SOURCE

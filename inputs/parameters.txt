@@ -1,8 +1,8 @@
 T = 2
-nx = 501
-nz = 501
-nx_abc = 701
-nz_abc = 701
+nx = 851
+nz = 351
+nx_abc = 1051
+nz_abc = 551
 nt = 4000
 dx = 10.0
 dz = 10.0
