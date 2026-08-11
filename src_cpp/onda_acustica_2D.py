@@ -1,4 +1,3 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -27,7 +26,7 @@ dt = float(parameters["dt"])
 nrec = int(parameters["nrec"])
 Nboudary = int(parameters["Nboudary"])
 
-'''
+
 #----------------------------------
 # plot one snap of the simulation
 #----------------------------------
@@ -48,7 +47,7 @@ plt.ylabel("z (m)")
 plt.title("Wavefield Snapshot")
 
 plt.show()
-
+'''
 #----------------------------------
 # plot the PVxz
 #----------------------------------
@@ -78,7 +77,7 @@ plt.quiver(X[::step, ::step], Z[::step, ::step], PVx[::step, ::step], -PVz[::ste
 #headlength: comprimento da ponta da seta
 
 plt.show()
-'''
+
 #-------------------------------------------------------
 # plot the PVxz and PVOFxz to the snapshot corresponding
 #-------------------------------------------------------
@@ -97,11 +96,11 @@ X, Z = np.meshgrid(x, z, indexing='ij')
 
 step = 30  # menos denso
 
-#-------------------------------------------
 # função de plotagem com cor por direção
-#-------------------------------------------
+
 
 def plot_panel(ax, Vx, Vz, title):
+
     ax.imshow(wavefield.T, cmap="gray", origin="upper", extent=[0, nx*dx, nz*dz, 0], interpolation="bilinear", aspect="auto")
 
     Xs = X[::step, ::step]
@@ -110,8 +109,8 @@ def plot_panel(ax, Vx, Vz, title):
     Vx_s = Vx[::step, ::step]
     Vz_s = Vz[::step, ::step]
 
-    # --- normalização para vetor unitário ---
-    norm = np.sqrt(Vx_s**2 + Vz_s**2)
+    # normalização para vetor unitário
+    norm = np.sqrt(Vx_s*2 + Vz_s*2)
     norm[norm == 0] = np.nan  # evita divisão por zero; NaN faz o quiver ignorar essas setas
 
     Vxs = Vx_s / norm
@@ -128,20 +127,19 @@ def plot_panel(ax, Vx, Vz, title):
     ax.set_xlabel("x (m)")
     ax.set_ylabel("z (m)")
 
-#-------------------------------------------
 # figura com 2 painéis
-#-------------------------------------------
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 plot_panel(axes[0], PVx_pv, PVz_pv, "(a) Poynting vector (Yoon & Marfurt)")
+
 plot_panel(axes[1], PVx_of, PVz_of, "(b) Optical flow (Horn-Schunck)")
 
 plt.tight_layout()
 
 plt.show()
 
-'''
+
 #-------------------------------------------
 # animation with Poynting vectors
 #------------------------------------------
@@ -155,15 +153,15 @@ z = np.arange(nz) * dz
 X, Z = np.meshgrid(x, z, indexing="ij")
 
 # primeiro frame
-wave = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_250.bin", dtype=np.float32).reshape(nx,nz)
+wave = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_1500.bin", dtype=np.float32).reshape(nx,nz)
 
 #PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX250.bin", dtype=np.float32).reshape(nx,nz)
 
 #PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ250.bin",dtype=np.float32).reshape(nx,nz)
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx250.bin", dtype=np.float32)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx1500.bin", dtype=np.float32)
 
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz250.bin", dtype=np.float32)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz1500.bin", dtype=np.float32)
 
 img = ax.imshow(wave.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], interpolation="bilinear", aspect="auto")
 
@@ -228,18 +226,16 @@ ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=Tru
 
 plt.show()
 '''
-
 #----------------------------------
-# velocity model marmousi Juan
+# velocity model 
 #----------------------------------
 
-vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/vp_marmousi-ii_shape_(2801, 13601)_dh10m_Nz351_Nx851.bin", dtype=np.float32)
-
-vel = vel.reshape((nz, nx))
+vel = np.fromfile("/home/processamento/acustica_2D/inputs/velocityModel.bin", dtype=np.float32)
+vel = vel.reshape((nx, nz))  # mesma ordem row-major usada no C++ (c[i * nz_abc + j])
 
 plt.figure(figsize=(8,6))
 
-plt.imshow(vel, origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
+plt.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
 
 plt.colorbar(label="Velocity (m/s)")
 
@@ -252,7 +248,7 @@ plt.show()
 
 '''
 #----------------------------------
-# velocity model
+# velocity model marmousi juan
 #----------------------------------
 
 vel = np.fromfile("/home/processamento/acustica_2D/src_cpp/vp_marmousi-ii_shape_(2801, 13601)_dh25m_Nz141_Nx681.bin", dtype=np.float32)
@@ -271,7 +267,7 @@ plt.ylabel("z (m)")
 plt.title("Velocity Model")
 
 plt.show()
-
+'''
 #----------------------------------
 # Plot the sismogram
 #----------------------------------
@@ -295,4 +291,25 @@ plt.colorbar()
 
 plt.show()
 
+
+'''
+image = np.fromfile("/home/processamento/acustica_2D/outputs/image.bin", dtype=np.float32)
+
+expected = nx * nz
+print(f"elementos lidos: {image.size}, esperado: {expected}")
+
+image = image.reshape(nx, nz)
+
+plt.figure(figsize=(6, 8))
+vmax = np.percentile(np.abs(image), 99) if np.any(image) else 1.0
+plt.imshow(image.T, cmap="gray", aspect="auto", vmin=-vmax, vmax=vmax)
+plt.xlabel("x")
+plt.ylabel("z (profundidade)")
+plt.title("Imagem migrada (RTM)")
+plt.colorbar(label="Amplitude")
+plt.savefig("image.png", dpi=150)
+plt.show()
+
+print("energia total:", np.sum(image.astype(np.float64) ** 2))
+print("min/max:", image.min(), image.max())
 '''

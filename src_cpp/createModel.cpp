@@ -8,19 +8,19 @@
 // media speeds
 //-------------------------------
 
-float* velocity(int nx_abc, int nz_abc, float c1, float c2, int interface_Z){
+float* velocity(int nx, int nz, float c1, float c2, int interface_Z){
 
-    float *velocity = (float*) malloc(nx_abc * nz_abc * sizeof(float));
+    float *velocity = (float*) malloc(nx * nz * sizeof(float));
 
-    for(int i = 0; i < nx_abc; i++){
+    for(int i = 0; i < nx; i++){
 
-        for(int j = 0; j < nz_abc; j++){
+        for(int j = 0; j < nz; j++){
 
             if(j < interface_Z){
-                velocity[i * nz_abc + j] = c1;
+                velocity[i * nz + j] = c1;
             }
             else{
-                velocity[i * nz_abc + j] = c2;
+                velocity[i * nz + j] = c2;
             }
         }
     }
@@ -33,16 +33,16 @@ float* velocity(int nx_abc, int nz_abc, float c1, float c2, int interface_Z){
 //----------------------------------
 
 
-bool CFL(const float* c, float dt, float dx, float dz, int nx_abc, int nz_abc){ //function of the stability codition
+bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //function of the stability codition
 
     float cmax = 0.0f;
 
 
-    for(int i = 0; i < nx_abc; i++){
+    for(int i = 0; i < nx; i++){
 
-        for(int j = 0; j < nz_abc; j++){
+        for(int j = 0; j < nz; j++){
 
-            cmax = std::max(cmax, c[i * nz_abc + j]);
+            cmax = std::max(cmax, c[i * nz + j]);
         }
     }
 
@@ -77,16 +77,16 @@ int main(){
     float c1 = 0.0f;
     float c2 = 0.0f;
 
-    int nx_abc = 0;
-    int nz_abc = 0;
+    int nx = 0;
+    int nz = 0;
     int interface_Z = 0;
     int Nboudary = 0;
 
 
     while(fgets(linha, sizeof(linha), file_parameters)){
 
-        sscanf(linha, "nx_abc = %d", &nx_abc);
-        sscanf(linha, "nz_abc = %d", &nz_abc);
+        sscanf(linha, "nx = %d", &nx);
+        sscanf(linha, "nz  = %d", &nz);
         sscanf(linha, "dx = %f", &dx);
         sscanf(linha, "dz = %f", &dz);
         sscanf(linha, "dt = %f", &dt);
@@ -100,13 +100,13 @@ int main(){
 
     fclose(file_parameters);
 
-    float *c = velocity(nx_abc, nz_abc, c1, c2, interface_Z);
+    float *c = velocity(nx, nz, c1, c2, interface_Z);
 
 //----------------------------------
 // CFL check
 //----------------------------------
 
-    if(CFL(c, dt, dx, dz, nx_abc, nz_abc)){
+    if(CFL(c, dt, dx, dz, nx, nz)){
 
         std::cout << "Stable simulation" << std::endl;
     }
@@ -116,34 +116,22 @@ int main(){
     }
 
 //------------------------------------------
-// Save the documento of the velocity model
-//-----------------------------------------
+// Save the velocity model as binary (.bin)
+//------------------------------------------
 
-    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModel.csv", "w"); //Creates a pointer to a file and opens a file named "sources.csv" in write mode (w)
+    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModel.bin", "wb"); // "wb" = write binary
 
     if(file_velocities == NULL){
-        printf("Erro ao abrir sources.csv\n");
+        printf("Erro ao abrir velocityModel.bin\n");
         return 1;
     }
 
-    fprintf(file_velocities, "c\n"); //writing the header
-
-    for(int i = 0; i < nx_abc; i++){
-        for(int j = 0; j < nz_abc; j++){
-            
-            fprintf(file_velocities, "%.1f", c[i * nz_abc + j]);
-
-            if(j < nz_abc - 1){
-                fprintf(file_velocities, ",");
-            }
-        }
-
-        fprintf(file_velocities, "\n");
-    }
+    // Grava o array inteiro de uma vez (mais rápido que escrever elemento a elemento)
+    fwrite(c, sizeof(float), nx * nz, file_velocities);
 
     fclose(file_velocities);
 
-    std::cout << "Velocity csv file saved!" << std::endl;
+    std::cout << "Velocity bin file saved!" << std::endl;
 
     free(c);
 
