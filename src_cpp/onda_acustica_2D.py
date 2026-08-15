@@ -27,7 +27,7 @@ dt = float(parameters["dt"])
 nrec = int(parameters["nrec"])
 Nboudary = int(parameters["Nboudary"])
 
-
+'''
 #----------------------------------
 # plot one snap of the simulation
 #----------------------------------
@@ -109,7 +109,7 @@ plt.tight_layout()
 
 plt.show()
 
-'''
+
 # ---------------------------------------------------------
 # diferença angular (arccos do produto escalar normalizado)
 # ---------------------------------------------------------
@@ -153,7 +153,7 @@ plt.show()
 
 print(f"Erro angular mediano: {np.nanmedian(angle_diff):.2f} graus")
 print(f"Erro angular médio:   {np.nanmean(angle_diff):.2f} graus")
-'''
+
 #---------------------------------------------
 # animation with Poynting vectors (Direction)
 #---------------------------------------------
@@ -264,7 +264,7 @@ plt.colorbar(img2, label="Amplitude")
 
 plt.show()
 
-'''
+
 
 #----------------------------------
 # animatiom 1D acustic wave
@@ -342,7 +342,7 @@ plt.ylabel("z (m)")
 plt.title("Velocity Model")
 
 plt.show()
-
+'''
 #----------------------------------
 # Plot the sismogram
 #----------------------------------
@@ -365,4 +365,27 @@ plt.title("Seismogram")
 plt.colorbar()
 
 plt.show()
-'''
+
+#----------------------------------
+# PLOT THE MIGRATED IMAGE
+#----------------------------------
+
+image = np.fromfile("/home/processamento/acustica_2D/outputs/image.bin", dtype=np.float32)
+
+image = image.reshape(nx, nz)
+
+plt.figure(figsize=(6, 8))
+
+vmax = np.percentile(np.abs(image), 99) if np.any(image) else 1.0
+
+plt.imshow(image.T, cmap="gray", aspect="auto", vmin=-vmax, vmax=vmax)
+
+plt.xlabel("x (m)")
+
+plt.ylabel("z (m)")
+
+plt.title("Migrated Image (RTM)")
+
+plt.colorbar(label="Amplitude")
+
+plt.show()
