@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from scipy.stats import pearsonr
+from matplotlib.colors import Normalize
+from scipy.ndimage import laplace
 
 #----------------------------------
 # PARAMETERS
@@ -48,7 +50,49 @@ plt.ylabel("z (m)")
 plt.title("Wavefield Snapshot")
 
 plt.show()
+'''
 
+#----------------------------------
+# plot two snapshots side by side
+#----------------------------------
+
+data_fwd = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_fwd_3000.bin",dtype=np.float32)
+
+data_back = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_back_3000.bin",dtype=np.float32)
+
+wavefield_fwd = data_fwd.reshape((nx, nz))
+
+wavefield_back = data_back.reshape((nx, nz))
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+# Snapshot forward
+im1 = axes[0].imshow(wavefield_fwd.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
+
+axes[0].set_xlabel("x (m)")
+
+axes[0].set_ylabel("z (m)")
+
+axes[0].set_title("Forward Wavefield")
+
+fig.colorbar(im1, ax=axes[0], label="Amplitude")
+
+# Snapshot backward
+im2 = axes[1].imshow(wavefield_back.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
+
+axes[1].set_xlabel("x (m)")
+
+axes[1].set_ylabel("z (m)")
+
+axes[1].set_title("Backward Wavefield")
+
+fig.colorbar(im2, ax=axes[1], label="Amplitude")
+
+plt.tight_layout()
+
+plt.show()
+
+'''
 #--------------------------------------------------------
 # plot the PVxz and PVOFxz to the snapshot corresponding
 #--------------------------------------------------------
@@ -263,7 +307,7 @@ ani2.save("/home/processamento/acustica_2D/outputs/poynting_of.gif", writer=anim
 plt.colorbar(img2, label="Amplitude")
 
 plt.show()
-
+'''
 
 
 #----------------------------------
@@ -272,7 +316,7 @@ plt.show()
 
 fig, ax = plt.subplots(figsize=(8,6))
 
-first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
+first = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_fwd_10.bin", dtype=np.float32)
 first = first.reshape((nx, nz))
 
 img = ax.imshow(first.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto", animated=True)
@@ -286,21 +330,21 @@ ax.set_title("2D Acoustic Wave")
 
 def update(frame):
 
-    data = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_{frame}.bin", dtype=np.float32)
+    data = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_fwd_{frame}.bin", dtype=np.float32)
 
     wavefield = data.reshape((nx, nz))
 
     img.set_array(wavefield.T)
-
+    plt.title(f"{frame}")
     return [img]
 
-frames = range(250, 3500, 250)
+frames = range(6000, 10, -10)
 
 ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
 
 plt.show()
 
-'''
+
 #----------------------------------
 # velocity model 
 #----------------------------------
@@ -317,7 +361,7 @@ plt.colorbar(label="Velocity (m/s)")
 plt.xlabel("x (m)")
 plt.ylabel("z (m)")
 
-plt.title("Velocity Model by Yuri")
+plt.title("Velocity Model")
 
 plt.show()
 
@@ -367,6 +411,29 @@ plt.colorbar()
 plt.show()
 
 #----------------------------------
+# Plot the sismogram WITH MUTE
+#----------------------------------
+
+data = np.fromfile("/home/processamento/acustica_2D/outputs/seismogram_mute.bin", dtype=np.float32)
+
+seismogram = data.reshape((nrec, nt), order="C")
+
+plt.figure(figsize=(10,8))
+
+vmax = np.percentile(np.abs(seismogram), 99)
+
+plt.imshow(seismogram.T, cmap="gray", aspect="auto", vmin=-vmax, vmax=vmax)
+
+plt.xlabel("Receiver")
+plt.ylabel("Time sample")
+
+plt.title("Seismogram")
+
+plt.colorbar()
+
+plt.show()
+
+#----------------------------------
 # PLOT THE MIGRATED IMAGE
 #----------------------------------
 
@@ -387,5 +454,99 @@ plt.ylabel("z (m)")
 plt.title("Migrated Image (RTM)")
 
 plt.colorbar(label="Amplitude")
+
+plt.show()
+
+#----------------------------------
+# Carrega os dados 
+#----------------------------------
+
+vel = np.fromfile("/home/processamento/acustica_2D/inputs/velocityModel.bin", dtype=np.float32)
+
+vel = vel.reshape((nx, nz)) 
+
+image = np.fromfile("/home/processamento/acustica_2D/outputs/image.bin", dtype=np.float32)
+
+image = image.reshape((nx, nz))
+
+#----------------------------------
+# Filtro Laplaciano 
+#----------------------------------
+
+image_filt = laplace(image)
+
+vmax_filt = np.percentile(np.abs(image_filt), 99)
+
+plt.figure(figsize=(6, 8))
+
+plt.imshow(image_filt.T, cmap="gray", aspect="auto", vmin=-vmax_filt, vmax=vmax_filt)
+
+plt.xlabel("x (m)")
+
+plt.ylabel("z (m)")
+
+plt.title("Imagem migrada — após filtro Laplaciano")
+
+plt.colorbar(label="Amplitude")
+
+plt.show()
+
+#----------------------------------
+# Posições da fonte e dos receptores
+#----------------------------------
+
+src_ix, src_iz = 250, 100
+
+src_x = src_ix * dx
+src_z = src_iz * dz
+
+rx_init = 60
+rx_end = 440
+nrec = 381
+
+rec_x = np.arange(rx_init, rx_end + 1) * dx
+rec_z = 60 * dz
+
+#----------------------------------
+# imagem sobreposta com modelo
+#----------------------------------
+
+vmax = np.percentile(np.abs(image), 99) if np.any(image) else 1.0
+
+fig3, ax3 = plt.subplots(figsize=(8, 8))
+
+ax3.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], cmap="PuOr", alpha=0.4, aspect="auto")
+
+norm = Normalize(vmin=-vmax, vmax=vmax)
+
+cmap_img = plt.get_cmap("Greys")
+
+rgba_img = cmap_img(norm(image.T))
+
+alpha_img = np.clip((np.abs(image.T) / vmax) ** 0.5, 0, 1)
+
+rgba_img[..., 3] = alpha_img
+
+ax3.imshow(rgba_img, origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
+
+ax3.scatter(rec_x, np.full_like(rec_x, rec_z), marker="v", color="green", s=20, label="Receivers", zorder=5)
+
+ax3.scatter([src_x], [src_z], marker="*", color="yellow", s=220, edgecolor="k", linewidth=0.6, label="Sources", zorder=6)
+
+ax3.set_xlabel("Distance (m)")
+
+ax3.set_ylabel("Depth (m)")
+
+ax3.set_title("RTM")
+
+ax3.legend(loc="upper right", fontsize=9, framealpha=0.9)
+
+sm = plt.cm.ScalarMappable(cmap=cmap_img, norm=norm)
+
+sm.set_array([])
+
+fig3.colorbar(sm, ax=ax3, fraction=0.046, pad=0.04)
+
+plt.tight_layout()
 
 plt.show()

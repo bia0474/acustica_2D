@@ -524,7 +524,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     // FORWARD FIELD
     //-----------------------------------
 
-    std::cout << "Starting the temporal and spacial loops to forward!" << std::endl;
+    std::cout << "Starting the temporal and spacial loops of the forward!" << std::endl;
 
     for (int n = 1; n < nt; n++)
     { // each iteration calculates the wave at the next instant
@@ -560,7 +560,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         for (int k = 0; k < Nsource; k++)
         {
             // adds energy to the grid
-            u_next[sx[k] * nz_abc + sz[k]] += fonte[n];
+            u_next[sx[k] * nz_abc + sz[k]] += (fonte[n])/(dx * dz);
         }
 
         //-----------------------------------
@@ -569,7 +569,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         if (n == 1)
         {
-            std::cout << "Making the CERJAN boudary to forward" << std::endl;
+            std::cout << "Making the CERJAN boudary of the forward" << std::endl;
         }
 
         #pragma omp parallel for collapse(2)
@@ -634,28 +634,30 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             seismogram[i * nt + n] = u_next[xr * nz_abc + zr];
         }
-
+        
         //-------------------------------------------------------
         // SAVE ALL THE SNAPSHOT HERE (binary document)
         //-------------------------------------------------------
 
         if (n == 1)
         {
-            std::cout << "Saving the file of the snapshots!" << std::endl;
+            std::cout << "Saving the file of the snapshots of the forward!" << std::endl;
         }
 
-        std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(n) + ".bin", std::ios::binary);
-
-        for (int x = Nboudary; x < nx_abc - Nboudary; x++)
+        if (n % 10 == 0)
         {
+            std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(n) + ".bin", std::ios::binary);
 
-            file.write(reinterpret_cast<char *>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
+            for (int x = Nboudary; x < nx_abc - Nboudary; x++)
+            {
 
-        }
+                file.write(reinterpret_cast<char *>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
 
-        file.close();
+            }
 
-
+            file.close();
+        }       
+        
         //----------------------------------
         // advance in time
         //----------------------------------
@@ -678,6 +680,56 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     std::cout << "Seismogram binary file saved!" << std::endl;
 
     //-----------------------------------
+    // MUTE DA ONDA DIRETA
+    //-----------------------------------
+
+    float v_direct = 1500.0f;   // velocidade da onda direta (m/s)
+    float shift     = 0.10f;    // atraso após a chegada da onda direta (s)
+    float window    = 0.1f;    // duração da rampa (s)
+
+    #pragma omp parallel for
+    for (int r = 0; r < nrec; r++)
+    {
+        float dz_rec = (receivers[r].z - sz[0]) * dz;
+        float dx_rec = (receivers[r].x - sx[0]) * dx;
+
+        float dist = std::sqrt(dz_rec * dz_rec + dx_rec * dx_rec);
+
+        float traveltime = (dist / v_direct) + shift;
+
+        float t1 = traveltime;
+        float t2 = t1 + window;
+
+        for (int it = 0; it < nt; it++)
+        {
+            float t = it * dt;
+
+            if (t < t1)
+            {
+                seismogram[r * nt + it] = 0.0f;
+            }
+            else if (t < t2)
+            {
+                seismogram[r * nt + it] *= (t - t1) / (t2 - t1);
+            }
+        }
+    }
+
+    //----------------------------------------------
+    // SAVE THE DOCUMENT OF THE SISMOGRAM WITH MUTE
+    //----------------------------------------------
+
+    std::cout << "Saving the seismogram binary file!" << std::endl;
+
+    std::ofstream file_mute("/home/processamento/acustica_2D/outputs/seismogram_mute.bin", std::ios::binary);
+
+    file_mute.write(reinterpret_cast<char *>(seismogram), nrec * nt * sizeof(float));
+
+    file_mute.close();
+
+    std::cout << "Seismogram binary file saved!" << std::endl;
+
+    //-----------------------------------
     // SAVE the copy of the final field
     //-----------------------------------
 
@@ -688,7 +740,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         result[i] = u_curr[i];
     }
-
+    
     //-----------------------------------
     // BACKWARD FIELD
     //-----------------------------------
@@ -723,7 +775,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             int xr = receivers[r].x; //pega a posição no grid
             int zr = receivers[r].z;
 
-            u_back_next[xr * nz_abc + zr] += seismogram[r * nt + (nt - 1 - n)]; //nt - 1 - n pega o último passo do laço que é zero
+            u_back_next[xr * nz_abc + zr] += (seismogram[r * nt + (nt - 1 - n)])/(dx * dz); //nt - 1 - n pega o último passo do laço que é zero
         }
 
         //-----------------------------------
@@ -732,7 +784,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         if (n == 1)
         {
-            std::cout << "Making the CERJAN boudary to backward" << std::endl;
+            std::cout << "Making the CERJAN boudary of the backward" << std::endl;
         }
 
         #pragma omp parallel for collapse(2)
@@ -785,26 +837,49 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             }
         }
 
+        //-------------------------------------------------------
+        // SAVE ALL THE SNAPSHOT HERE (binary document)
+        //-------------------------------------------------------
+
+        if (n == 1)
+        {
+            std::cout << "Saving the file of the snapshots of the backward!" << std::endl;
+        }
+
+        if (n % 10 == 0)
+        {
+            std::ofstream file("/home/processamento/acustica_2D/outputs/snapshot_back_" + std::to_string(n) + ".bin", std::ios::binary);
+
+            for (int x = Nboudary; x < nx_abc - Nboudary; x++)
+            {
+
+                file.write(reinterpret_cast<char *>(&u_back_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
+
+            }
+
+            file.close();
+        }
+
         //----------------------------------
         // imaging condition
         //----------------------------------
 
         int fwd_index = nt - 1 - n;
 
-        if (fwd_index != 0) // em t=0 o campo forward é zero por definição
+        if (fwd_index != 0 && fwd_index % 10 == 0) // em t=0 o campo forward é zero por definição
         {
-            std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_" + std::to_string(fwd_index) + ".bin", std::ios::binary);
+            std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + ".bin", std::ios::binary);
 
             if (!fwd_file.is_open()) //verificação ao abrir arquivo
             {
-                std::cerr << "ERRO: nao abriu snapshot_" << fwd_index << ".bin" << std::endl;
+                std::cerr << "ERRO: nao abriu snapshot_fwd_" << fwd_index << ".bin" << std::endl;
             }
 
             fwd_file.read(reinterpret_cast<char *>(u_fwd_n), nx * nz * sizeof(float));
 
             if (!fwd_file) //verificação na leitura do arquivo
             {
-                std::cerr << "ERRO: leitura incompleta em snapshot_" << fwd_index << ".bin, leu " << fwd_file.gcount() << " bytes" << std::endl;
+                std::cerr << "ERRO: leitura incompleta em snapshot_fwd_" << fwd_index << ".bin, leu " << fwd_file.gcount() << " bytes" << std::endl;
             }
 
             fwd_file.close();
@@ -818,7 +893,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
         }
-
+        
         //----------------------------------
         // advance in time
         //----------------------------------
