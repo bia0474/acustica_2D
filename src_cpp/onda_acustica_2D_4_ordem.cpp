@@ -527,17 +527,18 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     float *seismogram = (float *)calloc(nrec * nt, sizeof(float));
 
     //----------------------------------
-    // IMAGE CONDITION
+    // IMAGE CONDITION + ADCIGs
     //----------------------------------
 
-    float *image   = (float *)calloc(nx * nz, sizeof(float));
+    const float angle_step = 5.0f;
+    const int n_gathers = 18;
+
+    float *image = (float *)calloc(n_gathers * nx * nz, sizeof(float)); 
     float *u_fwd_n = (float *)malloc(nx * nz * sizeof(float));
+    float *ux_fwd_n = (float *)malloc(nx * nz * sizeof(float));
+    float *uz_fwd_n = (float *)malloc(nx * nz * sizeof(float));
 
-    //----------------------------------
-    // ADCIGs
-    //----------------------------------
-
-    float *theta = (float *)calloc(nx_abc * nz_abc, sizeof(float));
+    float *theta = (float *)calloc(nx * nz, sizeof(float));
 
     //-----------------------------------
     // FORWARD FIELD
@@ -1030,9 +1031,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         // imaging condition + ADCIGs
         //----------------------------
 
-        const float angle_step = 5.0f;
-        const int n_bins = 18;
-
         const float EPS = 1e-12f;
 
         int fwd_index = nt - 1 - n;
@@ -1055,47 +1053,88 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             fwd_file.close();
 
+            // --------------------------------------------------------
+            // PV+OF_fwd_x and PV+OF_fwd_x
+            // --------------------------------------------------------
+
+            std::ifstream fwd_ux_file("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x" + std::to_string(fwd_index) + ".bin", std::ios::binary);
+
+            if (!fwd_ux_file.is_open())
+            {
+                std::cerr << "ERRO: nao abriu PV+OF_fwd_x" << fwd_index << ".bin" << std::endl;
+            }
+
+            fwd_ux_file.read(reinterpret_cast<char *>(ux_fwd_n), nx * nz * sizeof(float));
+
+            if (!fwd_ux_file)
+            {
+                std::cerr << "ERRO: leitura incompleta em PV+OF_fwd_x" << fwd_index << ".bin, leu " << fwd_ux_file.gcount() << " bytes" << std::endl;
+            }
+
+            fwd_ux_file.close();
+
+            std::ifstream fwd_uz_file("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z" + std::to_string(fwd_index) + ".bin", std::ios::binary);
+
+            if (!fwd_uz_file.is_open())
+            {
+                std::cerr << "ERRO: nao abriu PV+OF_fwd_z" << fwd_index << ".bin" << std::endl;
+            }
+
+            fwd_uz_file.read(reinterpret_cast<char *>(uz_fwd_n), nx * nz * sizeof(float));
+
+            if (!fwd_uz_file)
+            {
+                std::cerr << "ERRO: leitura incompleta em PV+OF_fwd_z" << fwd_index << ".bin, leu " << fwd_uz_file.gcount() << " bytes" << std::endl;
+            }
+
+            fwd_uz_file.close();
+
         }
         
-        for (int j = 2; j < nx_abc - 2; j++)
+        for (int j = 0; j < nx; j++)
         {
-            for (int i = 2; i < nz_abc - 2; i++)
+            for (int i = 0; i < nz; i++)
             {
-                float modulo_fwd = sqrt(ux_fwd[j * nz_abc + i] * ux_fwd[j * nz_abc + i] + uz_fwd[j * nz_abc + i] * uz_fwd[j * nz_abc + i]);
+                // -------------------
+                // opening angle
+                // -------------------
 
-                float modulo_back = sqrt(ux_back[j * nz_abc + i] * ux_back[j * nz_abc + i] + uz_back[j * nz_abc + i] * uz_back[j * nz_abc + i]);
+                float modulo_fwd  = sqrt(ux_fwd_n[j * nz + i] * ux_fwd_n[j * nz + i] + uz_fwd_n[j * nz + i] * uz_fwd_n[j * nz + i]);
 
-                if (modulo_fwd < EPS || modulo_back < EPS)
+                float modulo_back = sqrt(ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]);
+                
+                int gather = -1;
+
+                if (modulo_fwd > EPS && modulo_back > EPS)
                 {
-                    theta[idx] = -1.0f;   // sentinela: ponto invalido, nao entra em nenhum bin
-                    continue;
+                    float cos_2theta = (ux_fwd_n[j * nz + i] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_fwd_n[j * nz + i] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]) / (modulo_fwd * modulo_back);
+
+                    if (cos_2theta >  1.0f)
+                    {
+                        cos_2theta =  1.0f;
+                    }
+                    if (cos_2theta < -1.0f) 
+                    {
+                        cos_2theta = -1.0f;
+                    }
+
+                    theta[j * nz + i] = 0.5f * acos(cos_2theta) * 180.0f / M_PI; //converts to degrees
+
+                    if (theta[j * nz + i] >= 0.0f && theta[j * nz + i] < 90.0f)
+                    {
+                        gather = (int)(theta[j * nz + i] / angle_step);
+                    }
                 }
 
-                // protege contra erro numerico fora de [-1,1]
-                if (cos_2theta >  1.0f)
+                //-----------------------
+                // imaging condition
+                //------------------------
+                
+                if (gather >= 0)
                 {
-                    cos_2theta =  1.0f;
-                }
 
-                if (cos_2theta < -1.0f)
-                {
-                    cos_2theta = -1.0f;
-                }
-
-                theta[j * nz_abc + i] = 0.5 * acos((ux_fwd[j * nz_abc + i] * ux_back[j * nz_abc + i] + uz_fwd[j * nz_abc + i] * uz_back[j * nz_abc + i]) / (modulo_fwd * modulo_back));
-
-                theta[j * nz_abc + i] = (theta[j * nz_abc + i] * 180.0f) / M_PI; //converts to degrees
-
-                if (theta_deg < 0.0f || theta_deg >= 90.0f)
-                {
-                    continue;
-                }
-
-                int bin = (int)(theta_deg / ANGLE_STEP);
-
-                if (bin < 0 || bin >= N_BINS)
-                {
-                    continue;
+                image[gather * nx * nz + j * nz + i] += u_fwd_n[(j + Nboudary) * nz_abc + (i + Nboudary)] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
+                
                 }
             }
         }
