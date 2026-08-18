@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation, PillowWriter
 from scipy.stats import pearsonr
 from matplotlib.colors import Normalize
 from scipy.ndimage import laplace
@@ -308,13 +308,14 @@ plt.colorbar(img2, label="Amplitude")
 
 plt.show()
 '''
-#------------------------------------
+'''
+#-------------------------------------
 # animatiom 2D acustic wave - backward
-#------------------------------------
+#-------------------------------------
 
 fig, ax = plt.subplots(figsize=(8,6))
 
-frames = range(6000, 10, -10)
+frames = range(8000, 10, -10)
 
 clip = max(np.percentile(np.abs(np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_back_{f}.bin", dtype=np.float32)), 99.5)
     for f in frames[::40]
@@ -339,9 +340,12 @@ def update(frame):
     wavefield = data.reshape((nx, nz))
 
     img.set_array(wavefield.T)
+
     return [img]
 
-ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
+ani = FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
+
+ani.save("animacao_backward.gif", writer=PillowWriter(fps=20))
 
 plt.show()
 
@@ -370,14 +374,17 @@ def update(frame):
     wavefield = data.reshape((nx, nz))
 
     img.set_array(wavefield.T)
+
     return [img]
 
-frames = range(10, 6000, 10)
+frames = range(10, 8000, 10)
 
-ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
+ani = FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
+
+ani.save("animacao_farward.gif", writer=PillowWriter(fps=20))
 
 plt.show()
-
+'''
 
 #----------------------------------
 # velocity model 
@@ -545,7 +552,7 @@ rec_z = 60 * dz
 # imagem sobreposta com modelo
 #----------------------------------
 
-vmax = np.percentile(np.abs(image_filt), 99) if np.any(image_filt) else 1.0
+vmax = np.percentile(np.abs(image), 99) if np.any(image) else 1.0
 
 fig3, ax3 = plt.subplots(figsize=(8, 8))
 
@@ -555,9 +562,9 @@ norm = Normalize(vmin=-vmax, vmax=vmax)
 
 cmap_img = plt.get_cmap("Greys")
 
-rgba_img = cmap_img(norm(image_filt.T))
+rgba_img = cmap_img(norm(image.T))
 
-alpha_img = np.clip((np.abs(image_filt.T) / vmax) ** 0.5, 0, 1)
+alpha_img = np.clip((np.abs(image.T) / vmax) ** 0.5, 0, 1)
 
 rgba_img[..., 3] = alpha_img
 

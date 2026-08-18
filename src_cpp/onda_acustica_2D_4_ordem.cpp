@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <omp.h>
-#include <time.h>
 
 //-------------------------------
 // Struct of the receivers
@@ -221,10 +220,8 @@ void readSources(const char *sources_file, int Nsource, int **sx, int **sz, int 
 }
 
 //---------------------------------------
-// read velocity model (function)
+// read velocity model 
 //---------------------------------------
-
-
 
 float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int nz_abc, int Nboudary)
 {
@@ -243,22 +240,22 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
 
     fclose(file);
 
-    //Lê no formato como está salvo: nz x nx (linha = z fixo, todas as posições x)
+    //Reads in the format as saved: nz x nx (row = fixed z, all x positions)
     //float *c_raw = (float *)malloc(nx * nz * sizeof(float));
 
     //fread(c_raw, sizeof(float), nx * nz, file);
 
     //fclose(file);
 
-    // Transpõe para o formato que o resto do código espera: nx x nz
+    //Converts it to the format expected by the rest of the code: nx x nz.
     //float *c = (float *)malloc(nx * nz * sizeof(float));
 
     //for (int i = 0; i < nx; i++)
     //{
         //for (int j = 0; j < nz; j++)
         //{
-            // c_raw está em ordem (nz, nx): índice = j * nx + i
-            // c deve ficar em ordem (nx, nz): índice = i * nz + j
+            //c_raw is in (nz, nx) order: index = j * nx + i
+            //c must be in (nx, nz) order: index = i * nz + j
             //c[i * nz + j] = c_raw[j * nx + i];
         //}
     //}
@@ -268,7 +265,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     float *c_exp = (float *)calloc(nx_abc * nz_abc, sizeof(float));
 
     //----------------------------------
-    // Centro
+    // Center
     //----------------------------------
 
     for (int i = 0; i < nx; i++)
@@ -281,7 +278,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     }
 
     //----------------------------------
-    // Borda superior
+    // Top edge
     //----------------------------------
 
     for (int i = 0; i < Nboudary; i++)
@@ -294,7 +291,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     }
 
     //----------------------------------
-    // Borda inferior
+    // Bottom edge
     //----------------------------------
 
     for (int i = nx_abc - Nboudary; i < nx_abc; i++)
@@ -307,7 +304,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     }
 
     //----------------------------------
-    // Borda esquerda
+    // Left edge
     //----------------------------------
 
     for (int i = Nboudary; i < nx_abc - Nboudary; i++)
@@ -320,7 +317,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     }
 
     //----------------------------------
-    // Borda direita
+    // Right edge
     //----------------------------------
 
     for (int i = Nboudary; i < nx_abc - Nboudary; i++)
@@ -333,7 +330,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     }
 
     //----------------------------------
-    // Canto superior esquerdo
+    // Top-left corner
     //----------------------------------
 
     for (int i = 0; i < Nboudary; i++)
@@ -346,7 +343,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     }
 
     //----------------------------------
-    // Canto superior direito
+    // Top right corner
     //----------------------------------
 
     for (int i = 0; i < Nboudary; i++)
@@ -359,7 +356,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     }
 
     //----------------------------------
-    // Canto inferior esquerdo
+    // Bottom-left corner
     //----------------------------------
 
     for (int i = nx_abc - Nboudary; i < nx_abc; i++)
@@ -372,7 +369,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     }
 
     //----------------------------------
-    // Canto inferior direito
+    // Bottom right corner
     //----------------------------------
 
     for (int i = nx_abc - Nboudary; i < nx_abc; i++)
@@ -479,11 +476,11 @@ float *source(float f0, const float *t, int nt)
 float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int nx, int nz, int nx_abc, int nz_abc, int nt, const float *A, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec)
 {
 
-    float *u_curr = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // present field
-    float *u_next = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // future field
+    float *u_curr = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // present field of the fwd
+    float *u_next = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // future field of the fwd
 
-    float *u_back_curr = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // present field
-    float *u_back_next = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // future field
+    float *u_back_curr = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // present field of the back
+    float *u_back_next = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // future field of the back
 
     //----------------------------------
     // Poynting vector + Optical Flow
@@ -535,6 +532,12 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     float *image   = (float *)calloc(nx * nz, sizeof(float));
     float *u_fwd_n = (float *)malloc(nx * nz * sizeof(float));
+
+    //----------------------------------
+    // ADCIGs
+    //----------------------------------
+
+    float *theta = (float *)calloc(nx_abc * nz_abc, sizeof(float));
 
     //-----------------------------------
     // FORWARD FIELD
@@ -741,7 +744,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 file_PVxOF_fwd.write(reinterpret_cast<char *>(&ux_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
 
                 file_PVzOF_fwd.write(reinterpret_cast<char *>(&uz_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
-            }+
+            }
 
             file_fwd.close();
             file_PVxOF_fwd.close();
@@ -770,12 +773,12 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     std::cout << "Seismogram binary file saved!" << std::endl;
 
     //-----------------------------------
-    // MUTE DA ONDA DIRETA
+    // Direct Wave Mute
     //-----------------------------------
 
-    float v_direct = 1500.0f;   // velocidade da onda direta (m/s)
-    float shift     = 0.10f;    // atraso após a chegada da onda direta (s)
-    float window    = 0.1f;    // duração da rampa (s)
+    float v_direct = 1500.0f;   // direct wave velocity (m/s)
+    float shift     = 0.10f;    // delay after the arrival of the direct wave(s)
+    float window    = 0.1f;    // ramp duration (s)
 
     #pragma omp parallel for
     for (int r = 0; r < nrec; r++)
@@ -836,7 +839,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     //-----------------------------------
 
     for (int n = 1; n < nt; n++)
-    { // cada iteração calcula o campo backward no instante seguinte (que fisicamente é um tempo anterior)
+    { // Each iteration calculates the backward field at the next instant (which, physically, is an earlier time).
 
         //----------------------------------
         // space loop - 4th order 
@@ -922,14 +925,14 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         //----------------------------------
         // injection energy to the grid
         //----------------------------------
-        //os valores registrados no sismograma são lidos na posição dos receptores reversamente e injetados 
+        //The values ​​recorded on the seismogram are read at the receiver positions in reverse order and injected. 
 
         for (int r = 0; r < nrec; r++)
         {
-            int xr = receivers[r].x; //pega a posição no grid
+            int xr = receivers[r].x; //take the grid position
             int zr = receivers[r].z;
 
-            u_back_next[xr * nz_abc + zr] += (seismogram[r * nt + (nt - 1 - n)])/(dx * dz); //nt - 1 - n pega o último passo do laço que é zero
+            u_back_next[xr * nz_abc + zr] += (seismogram[r * nt + (nt - 1 - n)])/(dx * dz); //nt - 1 - n take the last step of the loop, which is zero
         }
 
         //-----------------------------------
@@ -1023,24 +1026,99 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             file_PVzOF_back.close();
         }
 
-        //----------------------------------
-        // imaging condition
-        //----------------------------------
+        //----------------------------
+        // imaging condition + ADCIGs
+        //----------------------------
+
+        const float angle_step = 5.0f;
+        const int n_bins = 18;
+
+        const float EPS = 1e-12f;
 
         int fwd_index = nt - 1 - n;
 
-        if (fwd_index != 0 && fwd_index % 10 == 0) // em t=0 o campo forward é zero por definição
+        if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
         {
             std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + ".bin", std::ios::binary);
 
-            if (!fwd_file.is_open()) //verificação ao abrir arquivo
+            if (!fwd_file.is_open())
             {
                 std::cerr << "ERRO: nao abriu snapshot_fwd_" << fwd_index << ".bin" << std::endl;
             }
 
             fwd_file.read(reinterpret_cast<char *>(u_fwd_n), nx * nz * sizeof(float));
 
-            if (!fwd_file) //verificação na leitura do arquivo
+            if (!fwd_file)
+            {
+                std::cerr << "ERRO: leitura incompleta em snapshot_fwd_" << fwd_index << ".bin, leu " << fwd_file.gcount() << " bytes" << std::endl;
+            }
+
+            fwd_file.close();
+
+        }
+        
+        for (int j = 2; j < nx_abc - 2; j++)
+        {
+            for (int i = 2; i < nz_abc - 2; i++)
+            {
+                float modulo_fwd = sqrt(ux_fwd[j * nz_abc + i] * ux_fwd[j * nz_abc + i] + uz_fwd[j * nz_abc + i] * uz_fwd[j * nz_abc + i]);
+
+                float modulo_back = sqrt(ux_back[j * nz_abc + i] * ux_back[j * nz_abc + i] + uz_back[j * nz_abc + i] * uz_back[j * nz_abc + i]);
+
+                if (modulo_fwd < EPS || modulo_back < EPS)
+                {
+                    theta[idx] = -1.0f;   // sentinela: ponto invalido, nao entra em nenhum bin
+                    continue;
+                }
+
+                // protege contra erro numerico fora de [-1,1]
+                if (cos_2theta >  1.0f)
+                {
+                    cos_2theta =  1.0f;
+                }
+
+                if (cos_2theta < -1.0f)
+                {
+                    cos_2theta = -1.0f;
+                }
+
+                theta[j * nz_abc + i] = 0.5 * acos((ux_fwd[j * nz_abc + i] * ux_back[j * nz_abc + i] + uz_fwd[j * nz_abc + i] * uz_back[j * nz_abc + i]) / (modulo_fwd * modulo_back));
+
+                theta[j * nz_abc + i] = (theta[j * nz_abc + i] * 180.0f) / M_PI; //converts to degrees
+
+                if (theta_deg < 0.0f || theta_deg >= 90.0f)
+                {
+                    continue;
+                }
+
+                int bin = (int)(theta_deg / ANGLE_STEP);
+
+                if (bin < 0 || bin >= N_BINS)
+                {
+                    continue;
+                }
+            }
+        }
+        
+        /*
+        //----------------------------------
+        // imaging condition
+        //----------------------------------
+
+        int fwd_index = nt - 1 - n;
+
+        if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
+        {
+            std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + ".bin", std::ios::binary);
+
+            if (!fwd_file.is_open()) //check when opening file
+            {
+                std::cerr << "ERRO: nao abriu snapshot_fwd_" << fwd_index << ".bin" << std::endl;
+            }
+
+            fwd_file.read(reinterpret_cast<char *>(u_fwd_n), nx * nz * sizeof(float));
+
+            if (!fwd_file) //verification during file reading
             {
                 std::cerr << "ERRO: leitura incompleta em snapshot_fwd_" << fwd_index << ".bin, leu " << fwd_file.gcount() << " bytes" << std::endl;
             }
@@ -1056,6 +1134,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
         }
+        */
         
         //----------------------------------
         // advance in time
