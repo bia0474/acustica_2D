@@ -730,8 +730,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             std::ofstream file_fwd("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(n) + ".bin", std::ios::binary);
 
-            std::ofstream file_PVxOF_fwd("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx" + std::to_string(n) + ".bin", std::ios::binary);
-            std::ofstream file_PVzOF_fwd("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz" + std::to_string(n) + ".bin", std::ios::binary);
+            std::ofstream file_PVxOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x" + std::to_string(n) + ".bin", std::ios::binary);
+            std::ofstream file_PVzOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z" + std::to_string(n) + ".bin", std::ios::binary);
 
             for (int x = Nboudary; x < nx_abc - Nboudary; x++)
             {
@@ -741,7 +741,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 file_PVxOF_fwd.write(reinterpret_cast<char *>(&ux_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
 
                 file_PVzOF_fwd.write(reinterpret_cast<char *>(&uz_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
-            }
+            }+
 
             file_fwd.close();
             file_PVxOF_fwd.close();
@@ -1005,8 +1005,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             std::ofstream file_back("/home/processamento/acustica_2D/outputs/snapshot_back_" + std::to_string(n) + ".bin", std::ios::binary);
 
-            std::ofstream file_PVxOF_back("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx" + std::to_string(n) + ".bin", std::ios::binary);
-            std::ofstream file_PVzOF_back("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz" + std::to_string(n) + ".bin", std::ios::binary);
+            std::ofstream file_PVxOF_back("/home/processamento/acustica_2D/outputs/PV+OF_back_x" + std::to_string(n) + ".bin", std::ios::binary);
+            std::ofstream file_PVzOF_back("/home/processamento/acustica_2D/outputs/PV+OF_back_z" + std::to_string(n) + ".bin", std::ios::binary);
 
             for (int x = Nboudary; x < nx_abc - Nboudary; x++)
             {
