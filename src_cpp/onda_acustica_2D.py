@@ -499,7 +499,7 @@ plt.colorbar(label="Amplitude")
 plt.show()
 
 #----------------------------------
-# Carrega os dados 
+# Migrated image with filter
 #----------------------------------
 
 vel = np.fromfile("/home/processamento/acustica_2D/inputs/velocityModel.bin", dtype=np.float32)
@@ -509,10 +509,6 @@ vel = vel.reshape((nx, nz))
 image = np.fromfile("/home/processamento/acustica_2D/outputs/image.bin", dtype=np.float32)
 
 image = image.reshape((nx, nz))
-
-#----------------------------------
-# Filtro Laplaciano 
-#----------------------------------
 
 image_filt = laplace(image)
 
@@ -532,9 +528,9 @@ plt.colorbar(label="Amplitude")
 
 plt.show()
 
-#----------------------------------
+#-----------------------------------
 # Posições da fonte e dos receptores
-#----------------------------------
+#-----------------------------------
 
 src_ix, src_iz = 250, 100
 
@@ -587,6 +583,108 @@ sm = plt.cm.ScalarMappable(cmap=cmap_img, norm=norm)
 sm.set_array([])
 
 fig3.colorbar(sm, ax=ax3, fraction=0.046, pad=0.04)
+
+plt.tight_layout()
+
+plt.show()
+
+#----------------------------------
+# image of the ADCIGs
+#----------------------------------
+
+outdir = "/home/processamento/acustica_2D/outputs"
+angle_step = 5
+n_gathers = 18
+
+# ------------------------------------------------------------
+# Carrega todos os bins de angulo
+# ------------------------------------------------------------
+
+all_bins = np.zeros((n_gathers, nx, nz), dtype=np.float32)
+
+for b in range(n_gathers):
+
+    lo, hi = b * angle_step, b * angle_step + angle_step
+
+    all_bins[b] = np.fromfile(f"{outdir}/ADCIG_{lo}_{hi}.bin", dtype=np.float32).reshape(nx, nz)
+
+margin = 20  # ignora zona de borda/ABC
+
+# ------------------------------------------------------------
+# Detecta automaticamente a regiao iluminada (com sinal)
+# ------------------------------------------------------------
+
+energy_per_x = np.sum(np.abs(all_bins), axis=(0, 2))
+threshold = 0.05 * energy_per_x.max()
+illuminated = np.where(energy_per_x > threshold)[0]
+
+x_start = max(illuminated.min() - 10, margin)
+x_end   = min(illuminated.max() + 10, nx - margin)
+
+# ------------------------------------------------------------
+# Paineis (CIGs) espacados a cada 400 m
+# ------------------------------------------------------------
+
+panel_spacing_m = 400.0
+x_step = max(1, round(panel_spacing_m / dx))  # numero de amostras equivalente a 400m
+
+x_positions = np.arange(x_start, x_end, x_step)
+
+print(f"Regiao iluminada: x = {x_start*dx:.0f}m ate {x_end*dx:.0f}m "
+      f"({len(x_positions)} paineis (CIGs), espacados a cada {x_step*dx:.0f}m, "
+      f"{n_gathers} faixas de angulo por painel)")
+
+# ------------------------------------------------------------
+# Wiggle plot com normalizacao por traco
+# cada faixa vertical dentro de um painel = 1 gather de angulo
+# ------------------------------------------------------------
+
+def plot_wiggle(ax, trace, z_axis, x_offset, color="black"):
+
+    trace_max = np.max(np.abs(trace))
+
+    if trace_max < 1e-12:
+        return
+
+    amp = (trace / trace_max) * 0.9 + x_offset
+
+    ax.plot(amp, z_axis, color=color, linewidth=0.7)
+
+    ax.fill_betweenx(z_axis, x_offset, amp, where=(amp >= x_offset), color=color, linewidth=0, interpolate=True)
+
+z_axis = np.arange(nz) * dz
+fig, ax = plt.subplots(figsize=(18, 8))
+
+trace_spacing = 1.0
+panel_gap = 1.0
+panel_width = n_gathers * trace_spacing + panel_gap
+
+for p, ix in enumerate(x_positions):
+
+    panel_offset = p * panel_width
+
+    for b in range(n_gathers):          # cada b = um gather de angulo (5 em 5 graus)
+        trace = all_bins[b, ix, :]
+        x_offset = panel_offset + b * trace_spacing
+        plot_wiggle(ax, trace, z_axis, x_offset)
+
+    if p > 0:
+        ax.axvline(panel_offset - panel_gap/2, color="gray", linewidth=0.8)
+
+ax.invert_yaxis()
+
+ax.set_ylabel("Profundidade (m)")
+
+ax.set_xticks([])
+
+ax.set_title("ADCIGs - Poynting Vector", fontsize=14, fontweight="bold")
+
+n_panels = len(x_positions)
+ax.set_xlim(-panel_gap/2, (n_panels - 1) * panel_width + n_gathers * trace_spacing + panel_gap/2)
+ax.margins(x=0)
+
+ax.set_ylim(z_axis[-1], z_axis[0])
+ax.margins(y=0)
 
 plt.tight_layout()
 

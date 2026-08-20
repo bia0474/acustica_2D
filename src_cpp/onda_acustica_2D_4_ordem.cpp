@@ -527,13 +527,19 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     float *seismogram = (float *)calloc(nrec * nt, sizeof(float));
 
     //----------------------------------
+    // IMAGE CONDITION 
+    //----------------------------------
+
+    float *image = (float *)calloc(nx * nz, sizeof(float)); 
+
+    //----------------------------------
     // IMAGE CONDITION + ADCIGs
     //----------------------------------
 
     const float angle_step = 5.0f;
     const int n_gathers = 18;
 
-    float *image = (float *)calloc(n_gathers * nx * nz, sizeof(float)); 
+    float *image_ADCIGs = (float *)calloc(n_gathers * nx * nz, sizeof(float)); 
     float *u_fwd_n = (float *)malloc(nx * nz * sizeof(float));
     float *ux_fwd_n = (float *)malloc(nx * nz * sizeof(float));
     float *uz_fwd_n = (float *)malloc(nx * nz * sizeof(float));
@@ -1027,13 +1033,45 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             file_PVzOF_back.close();
         }
 
+        //----------------------------------
+        // imaging condition
+        //----------------------------------
+
+        int fwd_index = nt - 1 - n;
+
+        if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
+        {
+            std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + ".bin", std::ios::binary);
+
+            if (!fwd_file.is_open()) //check when opening file
+            {
+                std::cerr << "ERRO: nao abriu snapshot_fwd_" << fwd_index << ".bin" << std::endl;
+            }
+
+            fwd_file.read(reinterpret_cast<char *>(u_fwd_n), nx * nz * sizeof(float));
+
+            if (!fwd_file) //verification during file reading
+            {
+                std::cerr << "ERRO: leitura incompleta em snapshot_fwd_" << fwd_index << ".bin, leu " << fwd_file.gcount() << " bytes" << std::endl;
+            }
+
+            fwd_file.close();
+
+            #pragma omp parallel for collapse(2)
+            for (int x = 0; x < nx; x++)
+            {
+                for (int z = 0; z < nz; z++)
+                {
+                    image[x * nz + z] += u_fwd_n[x * nz + z] * u_back_next[(x + Nboudary) * nz_abc + (z + Nboudary)];
+                }
+            }
+        }
+
         //----------------------------
         // imaging condition + ADCIGs
         //----------------------------
 
         const float EPS = 1e-12f;
-
-        int fwd_index = nt - 1 - n;
 
         if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
         {
@@ -1133,47 +1171,11 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 if (gather >= 0)
                 {
 
-                image[gather * nx * nz + j * nz + i] += u_fwd_n[(j + Nboudary) * nz_abc + (i + Nboudary)] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
+                image_ADCIGs[gather * nx * nz + j * nz + i] += u_fwd_n[(j + Nboudary) * nz_abc + (i + Nboudary)] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
                 
                 }
             }
         }
-        
-        /*
-        //----------------------------------
-        // imaging condition
-        //----------------------------------
-
-        int fwd_index = nt - 1 - n;
-
-        if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
-        {
-            std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + ".bin", std::ios::binary);
-
-            if (!fwd_file.is_open()) //check when opening file
-            {
-                std::cerr << "ERRO: nao abriu snapshot_fwd_" << fwd_index << ".bin" << std::endl;
-            }
-
-            fwd_file.read(reinterpret_cast<char *>(u_fwd_n), nx * nz * sizeof(float));
-
-            if (!fwd_file) //verification during file reading
-            {
-                std::cerr << "ERRO: leitura incompleta em snapshot_fwd_" << fwd_index << ".bin, leu " << fwd_file.gcount() << " bytes" << std::endl;
-            }
-
-            fwd_file.close();
-
-            #pragma omp parallel for collapse(2)
-            for (int x = 0; x < nx; x++)
-            {
-                for (int z = 0; z < nz; z++)
-                {
-                    image[x * nz + z] += u_fwd_n[x * nz + z] * u_back_next[(x + Nboudary) * nz_abc + (z + Nboudary)];
-                }
-            }
-        }
-        */
         
         //----------------------------------
         // advance in time
@@ -1196,6 +1198,32 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     img_file.close();
 
     std::cout << "Migrated image binary file saved!" << std::endl;
+
+    // ----------------------------------------------------
+    // salvar as 18 imagens em disco
+    // ----------------------------------------------------
+
+    for (int bin = 0; bin < n_gathers; bin++)
+    {
+        float lo = bin * angle_step;
+        float hi = lo + angle_step;
+
+        std::string filename = "/home/processamento/acustica_2D/outputs/ADCIG_" + std::to_string((int)lo) + "_" + std::to_string((int)hi) + ".bin";
+
+        std::ofstream out_file(filename, std::ios::binary);
+
+        if (!out_file.is_open())
+        {
+            std::cerr << "ERRO: nao conseguiu salvar " << filename << std::endl;
+            continue;
+        }
+
+        out_file.write(reinterpret_cast<char *>(&image_ADCIGs[bin * nx * nz]), nx * nz * sizeof(float));
+
+        out_file.close();
+
+        std::cout << "Salvo: " << filename << std::endl;
+    }
 
     free(e);
     free(u_curr);
