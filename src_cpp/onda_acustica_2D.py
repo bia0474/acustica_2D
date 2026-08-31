@@ -596,10 +596,6 @@ outdir = "/home/processamento/acustica_2D/outputs"
 angle_step = 5
 n_gathers = 18
 
-# ------------------------------------------------------------
-# Carrega todos os bins de angulo
-# ------------------------------------------------------------
-
 all_bins = np.zeros((n_gathers, nx, nz), dtype=np.float32)
 
 for b in range(n_gathers):
@@ -607,6 +603,21 @@ for b in range(n_gathers):
     lo, hi = b * angle_step, b * angle_step + angle_step
 
     all_bins[b] = np.fromfile(f"{outdir}/ADCIG_{lo}_{hi}.bin", dtype=np.float32).reshape(nx, nz)
+
+# >>> NOVO: diagnostico de pico perto da interface real, por bin de angulo <
+ix = 150
+iz_interface = 250   # interface_Z, em indice da malha nx,nz
+janela = 15           # +/- indices ao redor da interface (150m pra cada lado)
+
+for b in range(n_gathers):
+    trace = all_bins[b, ix, :]
+    z_lo, z_hi = max(0, iz_interface - janela), min(nz, iz_interface + janela)
+    sub_trace = trace[z_lo:z_hi]
+    iz_local_peak = z_lo + np.argmax(np.abs(sub_trace))
+    peak_val = trace[iz_local_peak]
+    lo, hi = b * angle_step, b * angle_step + angle_step
+    print(f"bin {lo:2d}-{hi:2d}°:  z_pico(perto da interface) = {iz_local_peak*dz:6.0f} m   valor = {peak_val:12.4e}")
+# <<< FIM DO NOVO <
 
 margin = 20  # ignora zona de borda/ABC
 
@@ -622,10 +633,10 @@ x_start = max(illuminated.min() - 10, margin)
 x_end   = min(illuminated.max() + 10, nx - margin)
 
 # ------------------------------------------------------------
-# Paineis (CIGs) espacados a cada 400 m
+# Paineis (CIGs) espacados a cada 200 m
 # ------------------------------------------------------------
 
-panel_spacing_m = 400.0
+panel_spacing_m = 200
 x_step = max(1, round(panel_spacing_m / dx))  # numero de amostras equivalente a 400m
 
 x_positions = np.arange(x_start, x_end, x_step)
@@ -635,18 +646,16 @@ print(f"Regiao iluminada: x = {x_start*dx:.0f}m ate {x_end*dx:.0f}m "
       f"{n_gathers} faixas de angulo por painel)")
 
 # ------------------------------------------------------------
-# Wiggle plot com normalizacao por traco
+# Wiggle plot com normalizacao POR PAINEL (nao mais por traco)
 # cada faixa vertical dentro de um painel = 1 gather de angulo
 # ------------------------------------------------------------
 
-def plot_wiggle(ax, trace, z_axis, x_offset, color="black"):
+def plot_wiggle(ax, trace, z_axis, x_offset, norm_value, color="black"):
 
-    trace_max = np.max(np.abs(trace))
-
-    if trace_max < 1e-12:
+    if norm_value < 1e-12:
         return
 
-    amp = (trace / trace_max) * 0.9 + x_offset
+    amp = (trace / norm_value) * 0.9 + x_offset
 
     ax.plot(amp, z_axis, color=color, linewidth=0.7)
 
@@ -663,21 +672,24 @@ for p, ix in enumerate(x_positions):
 
     panel_offset = p * panel_width
 
+    # >>> um unico fator de normalizacao para todo o painel <
+    panel_max = np.max(np.abs(all_bins[:, ix, :]))
+
     for b in range(n_gathers):          # cada b = um gather de angulo (5 em 5 graus)
         trace = all_bins[b, ix, :]
         x_offset = panel_offset + b * trace_spacing
-        plot_wiggle(ax, trace, z_axis, x_offset)
+        plot_wiggle(ax, trace, z_axis, x_offset, panel_max)
 
     if p > 0:
         ax.axvline(panel_offset - panel_gap/2, color="gray", linewidth=0.8)
 
 ax.invert_yaxis()
 
-ax.set_ylabel("Profundidade (m)")
+ax.set_ylabel("z (m)")
 
 ax.set_xticks([])
 
-ax.set_title("ADCIGs - Poynting Vector", fontsize=14, fontweight="bold")
+ax.set_title("ADCIGs - Poynting Vector + OF", fontsize=14, fontweight="bold")
 
 n_panels = len(x_positions)
 ax.set_xlim(-panel_gap/2, (n_panels - 1) * panel_width + n_gathers * trace_spacing + panel_gap/2)
