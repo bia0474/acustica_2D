@@ -736,7 +736,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     //-----------------------------------
 
     float v_direct = 1500.0f;   // direct wave velocity (m/s)
-    float shift     = 0.20f;    // delay after the arrival of the direct wave(s)
+    float shift     = 0.50f;    // delay after the arrival of the direct wave(s)
     float window    = 0.1f;    // ramp duration (s)
 
     #pragma omp parallel for

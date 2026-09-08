@@ -701,3 +701,116 @@ ax.margins(y=0)
 plt.tight_layout()
 
 plt.show()
+
+'''
+#----------------------------------
+# image of the ADCIGs
+#----------------------------------
+
+outdir = "/home/processamento/acustica_2D/outputs"
+angle_step = 5
+n_gathers = 18
+
+all_bins = np.zeros((n_gathers, nx, nz), dtype=np.float32)
+
+for b in range(n_gathers):
+
+    lo, hi = b * angle_step, b * angle_step + angle_step
+
+    all_bins[b] = np.fromfile(f"{outdir}/ADCIG_{lo}_{hi}.bin", dtype=np.float32).reshape(nx, nz)
+
+# diagnostico de pico perto da interface real, por bin de angulo
+ix = 150
+iz_interface = 250
+janela = 15
+
+for b in range(n_gathers):
+    trace = all_bins[b, ix, :]
+    z_lo, z_hi = max(0, iz_interface - janela), min(nz, iz_interface + janela)
+    sub_trace = trace[z_lo:z_hi]
+    iz_local_peak = z_lo + np.argmax(np.abs(sub_trace))
+    peak_val = trace[iz_local_peak]
+    lo, hi = b * angle_step, b * angle_step + angle_step
+    print(f"bin {lo:2d}-{hi:2d}°:  z_pico(perto da interface) = {iz_local_peak*dz:6.0f} m   valor = {peak_val:12.4e}")
+
+margin = 20  # ignora zona de borda/ABC
+
+# ------------------------------------------------------------
+# Detecta automaticamente a regiao iluminada (com sinal)
+# ------------------------------------------------------------
+
+energy_per_x = np.sum(np.abs(all_bins), axis=(0, 2))
+threshold = 0.05 * energy_per_x.max()
+illuminated = np.where(energy_per_x > threshold)[0]
+
+x_start = max(illuminated.min() - 10, margin)
+x_end   = min(illuminated.max() + 10, nx - margin)
+
+# ------------------------------------------------------------
+# Paineis (CIGs) espacados a cada 200 m
+# ------------------------------------------------------------
+
+panel_spacing_m = 200
+x_step = max(1, round(panel_spacing_m / dx))
+
+x_positions = np.arange(x_start, x_end, x_step)
+
+print(f"Regiao iluminada: x = {x_start*dx:.0f}m ate {x_end*dx:.0f}m "
+      f"({len(x_positions)} paineis (CIGs), espacados a cada {x_step*dx:.0f}m, "
+      f"{n_gathers} faixas de angulo por painel)")
+
+# ------------------------------------------------------------
+# Density plot com normalizacao POR PAINEL
+# cada painel = um CIG; eixo horizontal dentro do painel = bin de angulo
+# ------------------------------------------------------------
+
+z_axis = np.arange(nz) * dz
+fig, ax = plt.subplots(figsize=(18, 8))
+
+trace_spacing = 1.0
+panel_gap = 1.0
+panel_width = n_gathers * trace_spacing + panel_gap
+
+for p, ix in enumerate(x_positions):
+
+    panel_offset = p * panel_width
+
+    panel_max = np.max(np.abs(all_bins[:, ix, :]))
+
+    if panel_max < 1e-12:
+        continue
+
+    panel_data = all_bins[:, ix, :].T   # (nz, n_gathers): linhas=z, colunas=bin de angulo
+
+    extent = [panel_offset, panel_offset + n_gathers * trace_spacing, z_axis[-1], z_axis[0]]
+
+    ax.imshow(
+        panel_data,
+        extent=extent,
+        aspect="auto",
+        cmap="seismic",
+        vmin=-panel_max,
+        vmax=panel_max,
+        interpolation="nearest",
+    )
+
+    if p > 0:
+        ax.axvline(panel_offset - panel_gap / 2, color="gray", linewidth=0.8)
+
+ax.set_ylabel("z (m)")
+
+ax.set_xticks([])
+
+ax.set_title("ADCIGs - Poynting Vector + OF (density)", fontsize=14, fontweight="bold")
+
+n_panels = len(x_positions)
+ax.set_xlim(-panel_gap / 2, (n_panels - 1) * panel_width + n_gathers * trace_spacing + panel_gap / 2)
+ax.margins(x=0)
+
+ax.set_ylim(z_axis[-1], z_axis[0])
+ax.margins(y=0)
+
+plt.tight_layout()
+
+plt.show()
+'''
