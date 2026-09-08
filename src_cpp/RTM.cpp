@@ -878,117 +878,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         // imaging condition + ADCIGs
         //----------------------------
 
-        /*
-        const float EPS = 1e-12f;
-
-        if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
-        {
-            std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + ".bin", std::ios::binary);
-
-            if (!fwd_file.is_open())
-            {
-                std::cerr << "ERRO: nao abriu snapshot_fwd_" << fwd_index << ".bin" << std::endl;
-            }
-
-            fwd_file.read(reinterpret_cast<char *>(u_fwd_n), nx * nz * sizeof(float));
-
-            if (!fwd_file)
-            {
-                std::cerr << "ERRO: leitura incompleta em snapshot_fwd_" << fwd_index << ".bin, leu " << fwd_file.gcount() << " bytes" << std::endl;
-            }
-
-            fwd_file.close();
-
-            // --------------------------------------------------------
-            // PV+OF_fwd_x and PV+OF_fwd_x
-            // --------------------------------------------------------
-
-            std::ifstream fwd_ux_file("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x" + std::to_string(fwd_index) + ".bin", std::ios::binary);
-
-            if (!fwd_ux_file.is_open())
-            {
-                std::cerr << "ERRO: nao abriu PV+OF_fwd_x" << fwd_index << ".bin" << std::endl;
-            }
-
-            fwd_ux_file.read(reinterpret_cast<char *>(ux_fwd_n), nx * nz * sizeof(float));
-
-            if (!fwd_ux_file)
-            {
-                std::cerr << "ERRO: leitura incompleta em PV+OF_fwd_x" << fwd_index << ".bin, leu " << fwd_ux_file.gcount() << " bytes" << std::endl;
-            }
-
-            fwd_ux_file.close();
-
-            std::ifstream fwd_uz_file("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z" + std::to_string(fwd_index) + ".bin", std::ios::binary);
-
-            if (!fwd_uz_file.is_open())
-            {
-                std::cerr << "ERRO: nao abriu PV+OF_fwd_z" << fwd_index << ".bin" << std::endl;
-            }
-
-            fwd_uz_file.read(reinterpret_cast<char *>(uz_fwd_n), nx * nz * sizeof(float));
-
-            if (!fwd_uz_file)
-            {
-                std::cerr << "ERRO: leitura incompleta em PV+OF_fwd_z" << fwd_index << ".bin, leu " << fwd_uz_file.gcount() << " bytes" << std::endl;
-            }
-
-            fwd_uz_file.close();
-
-            for (int j = 0; j < nx; j++)
-            {
-                for (int i = 0; i < nz; i++)
-                {
-                    // -------------------
-                    // opening angle
-                    // -------------------
-
-                    float modulo_fwd  = sqrt(ux_fwd_n[j * nz + i] * ux_fwd_n[j * nz + i] + uz_fwd_n[j * nz + i] * uz_fwd_n[j * nz + i]);
-
-                    float modulo_back = sqrt(ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]);
-
-                    int gather = -1;
-
-                    if (modulo_fwd > EPS && modulo_back > EPS)
-                    {
-                        float cos_2theta = (ux_fwd_n[j * nz + i] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_fwd_n[j * nz + i] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]) / (modulo_fwd * modulo_back);
-
-                        if (cos_2theta >  1.0f)
-                        {
-                            cos_2theta =  1.0f;
-                        }
-                        if (cos_2theta < -1.0f)
-                        {
-                            cos_2theta = -1.0f;
-                        }
-
-                        theta[j * nz + i] = 0.5f * acos(cos_2theta) * 180.0f / M_PI; //converts to degrees
-
-                        if (theta[j * nz + i] >= 0.0f && theta[j * nz + i] < 90.0f)
-                        {
-                            gather = (int)(theta[j * nz + i] / angle_step);
-                        }
-                    }
-
-                    //-----------------------
-                    // imaging condition
-                    //------------------------
-
-                    if (gather >= 0)
-                    {
-
-                    image_ADCIGs[gather * nx * nz + j * nz + i] += u_fwd_n[j * nz + i] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
-
-                    }
-                }
-            }
-        }
-        */
-
-        //----------------------------
-        // imaging condition + ADCIGs
-        //----------------------------
-
         if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
         {
             std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + ".bin", std::ios::binary);
@@ -1043,9 +932,10 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             fwd_uz_file.close();
 
-            // >>>>>>>>>>>>>>>> BLOCO NOVO <<<<<<<<<<<<<<
+            //calcula as amplitudes usadas para decidir se um ponto da malha entra ou não no cálculo do gather
             float max_amp_fwd = 0.0f, max_amp_back = 0.0f;
 
+            //encontrar a maior amplitude do campo forward e do campo backward no instante em questão
             for (int j = 0; j < nx; j++)
             {
                 for (int i = 0; i < nz; i++)
@@ -1053,15 +943,14 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     float m_f = sqrt(ux_fwd_n[j * nz + i] * ux_fwd_n[j * nz + i] + uz_fwd_n[j * nz + i] * uz_fwd_n[j * nz + i]);
                     if (m_f > max_amp_fwd) max_amp_fwd = m_f;
 
-                    float m_b = sqrt(ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)]
-                                    + uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]);
+                    float m_b = sqrt(ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]);
                     if (m_b > max_amp_back) max_amp_back = m_b;
                 }
             }
-
+            
+            //define que qualquer ponto com amplitude menor que 0,001% é considerado "não confiável" e é descartado no cálculo do gather
             float thresh_fwd  = 1e-5f * max_amp_fwd;
             float thresh_back = 1e-5f * max_amp_back;
-            // >>>>>>>>>>>>>>>> FIM DO BLOCO NOVO <<<<<<<<<<<<<<
 
             for (int j = 0; j < nx; j++)
             {
@@ -1075,17 +964,22 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                     float modulo_back = sqrt(ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]);
 
-                    int gather = -1;
+                    int gather = -1; //guarda o índice do bin de ângulo onde -1 signiifca "não classificado"
 
-                    if (modulo_fwd > thresh_fwd && modulo_back > thresh_back)
+                    if (modulo_fwd > thresh_fwd && modulo_back > thresh_back) //só deixa passar pontos com amplitude genuína o suficiente para confiar na direção estimada
                     {
+                        //definição de cosseno do ângulo entre dois vetores:
                         float cos_2theta = (ux_fwd_n[j * nz + i] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_fwd_n[j * nz + i] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]) / (modulo_fwd * modulo_back);
 
+                        //garante que o valor fique dentro do domínio válido da função aeco-cosseno [-1,1]
                         if (cos_2theta >  1.0f) cos_2theta =  1.0f;
                         if (cos_2theta < -1.0f) cos_2theta = -1.0f;
 
-                        theta[j * nz + i] = 0.5f * acos(cos_2theta) * 180.0f / M_PI;
+                        theta[j * nz + i] = 0.5f * acos(cos_2theta) * 180.0f / M_PI; //angulo para graus
 
+                        //Se o ângulo estiver no intervalo físico esperado [0°, 90°), calcula em qual bin discreto ele cai, dividindo pelo tamanho do passo de ângulo (angle_step) 
+                        // e truncando para inteiro. Por exemplo, se angle_step = 5° e theta = 23°, então gather = 4 (bin de 20°–25°)
+                        
                         if (theta[j * nz + i] >= 0.0f && theta[j * nz + i] < 90.0f)
                         {
                             gather = (int)(theta[j * nz + i] / angle_step);
