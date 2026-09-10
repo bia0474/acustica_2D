@@ -724,9 +724,7 @@ x_step = max(1, round(panel_spacing_m / dx))
 
 x_positions = np.arange(x_start, x_end, x_step)
 
-print(f"Regiao iluminada: x = {x_start*dx:.0f}m ate {x_end*dx:.0f}m "
-      f"({len(x_positions)} paineis (CIGs), espacados a cada {x_step*dx:.0f}m, "
-      f"{n_gathers} faixas de angulo por painel)")
+print(f"Regiao iluminada: x = {x_start*dx:.0f}m ate {x_end*dx:.0f}m "f"({len(x_positions)} paineis (CIGs), espacados a cada {x_step*dx:.0f}m, "f"{n_gathers} faixas de angulo por painel)")
 
 # ------------------------------------------------------------
 # Density plot (fundo) + Wiggle overlay (contorno dos eventos)
@@ -760,16 +758,7 @@ for p, ix in enumerate(x_positions):
     x0 = panel_offset
     x1 = panel_offset + n_gathers * trace_spacing
 
-    ax.imshow(
-        panel_data,
-        cmap="gray",
-        vmin=-panel_max,
-        vmax=panel_max,
-        extent=[x0, x1, z_axis[-1], z_axis[0]],
-        aspect="auto",
-        origin="upper",
-        interpolation="bilinear",   # <<< suaviza os blocos
-    )
+    ax.imshow(panel_data, cmap="gray",vmin=-panel_max,vmax=panel_max,extent=[x0, x1, z_axis[-1], z_axis[0]],aspect="auto",origin="upper",interpolation="bilinear",   # <<< suaviza os blocos)
 
     # ---- overlay: wiggle fino por cima, reforcando os eventos ----
     for b in range(n_gathers):

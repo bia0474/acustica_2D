@@ -1024,6 +1024,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         float lo = bin * angle_step;
         float hi = lo + angle_step;
 
+        //salva a imagem migrada inteira (todo x, todo z), limitada a um intervalo de ângulo - não é um "ADICIG"
         std::string filename = "/home/processamento/acustica_2D/outputs/ADCIG_" + std::to_string((int)lo) + "_" + std::to_string((int)hi) + ".bin";
 
         std::ofstream out_file(filename, std::ios::binary);
