@@ -840,9 +840,9 @@ plt.show()
 #----------------------------------
 
 dt = 0.000500
-shot_idx = 20
+shot_idx = 0
 
-fname = f"/home/processamento/acustica_2D/outputs/seismogram_shot{shot_idx}.bin"  # sem zero-padding, igual ao C++ (to_string)
+fname = f"/home/processamento/acustica_2D/outputs/seismogram_shot{shot_idx}_mute.bin"  # sem zero-padding, igual ao C++ (to_string)
 
 data = np.fromfile(fname, dtype=np.float32)
 nt_real = data.shape[0]
@@ -856,4 +856,43 @@ plt.xlabel("Tempo (s)")
 plt.ylabel("Amplitude")
 plt.title(f"Sismograma - Fonte {shot_idx}")
 plt.tight_layout()
+plt.show()
+
+#----------------------------------
+# Sismograma completo do CMP
+#----------------------------------
+
+dt = 0.000500
+n_pairs = 24
+
+pairs = pd.read_csv("/home/processamento/acustica_2D/inputs/pares_geometry.csv")  # tem colunas: par, sx_m, rx_m, offset_m, midpoint_m
+
+traces = []
+for i in range(n_pairs):
+    fname = f"/home/processamento/acustica_2D/outputs/seismogram_shot{i}.bin"
+    data = np.fromfile(fname, dtype=np.float32)
+    traces.append(data)
+
+# garante que todos os traços tem o mesmo tamanho (nt)
+nt_real = len(traces[0])
+data = np.stack(traces, axis=1)  # shape (nt, n_pairs)
+
+t = np.arange(nt_real) * dt
+offsets = pairs["offset_m"].values[:n_pairs]
+
+# ordena pelos offsets, caso os arquivos não estejam já em ordem crescente
+order = np.argsort(offsets)
+data_sorted = data[:, order]
+offsets_sorted = offsets[order]
+
+vclip = np.percentile(np.abs(data), 98)
+
+plt.figure(figsize=(9, 6))
+plt.imshow(data_sorted, aspect="auto", cmap="gray", extent=[offsets_sorted.min(), offsets_sorted.max(), t.max(), t.min()], vmin=-vclip, vmax=vclip)
+plt.xlabel("Offset (m)")
+plt.ylabel("Tempo (s)")
+plt.title("Sismograma completo (todos os pares fonte-receptor)")
+plt.colorbar(label="Amplitude")
+plt.tight_layout()
+plt.savefig("sismograma_completo.png", dpi=150)
 plt.show()
