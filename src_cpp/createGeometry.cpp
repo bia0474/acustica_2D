@@ -34,48 +34,62 @@ int *linspace(int start, int end, int quantity, int endpoint)
     return number;
 }
 
+
+
 int main()
 {
+    //-------------------------------
+    // Parametros do modelo 
+    //-------------------------------
+    int nx = 401;
+    int nz = 161;
+
+    double dx = 12.5;
+    double dz = 12.5;
 
     //-------------------------------
-    // Parametros do modelo (mesmos do solver)
+    // Parametros da geometria fonte/receptor
     //-------------------------------
 
-    int dx = 10; // m/ponto de grid em x
-    int dz = 10; // m/ponto de grid em z
+    int Nsource = 25;
+    int Nrec = 25;
 
-    //-------------------------------
-    // Parametros do CMP: midpoint fixo, offset variando
-    //-------------------------------
+    double spacing_m = 50.0; // distancia entre fontes consecutivas e entre receptores consecutivos
+    int spacing_grid = (int)(spacing_m / dx + 0.5);
 
-    int M_m = 5000;          // midpoint em metros (centro do modelo)
-    int offset_min_m = 200;  // menor afastamento fonte-receptor, em metros
-    int offset_max_m = 7600; // maior afastamento fonte-receptor, em metros
-    int Ncmp = 20;           // quantidade de pares (fold do CMP)
+    // Profundidade de fonte e receptor (em metros) - AJUSTE CONFORME NECESSARIO
+    double depth_source_m = 25.0;
+    double depth_rec_m = 25.0;
 
-    int depth_source_m = 100; // profundidade da fonte em metros
-    int depth_rec_m = 100;    // profundidade do receptor em metros
+    int sz_grid = (int)(depth_source_m / dz + 0.5);
+    int rz_grid = (int)(depth_rec_m / dz + 0.5);
 
-    // passo de offset, forcado a multiplo de 2*dx para sx/rx carem em ponto de grid exato
-    int step_m = (offset_max_m - offset_min_m) / (Ncmp - 1);
-    step_m = (step_m / (2 * dx)) * (2 * dx); // arredonda para baixo, multiplo de 2*dx
+    int mid_x = nx / 2; // indice de grid do meio do modelo em x
 
-    if (step_m <= 0)
+    if (spacing_grid <= 0)
     {
-        printf("Erro: intervalo de offset muito pequeno para Ncmp=%d pontos com dx=%d\n", Ncmp, dx);
+        printf("Erro: espacamento de %.1f m e menor que dx=%.2f m\n", spacing_m, dx);
         return 1;
     }
 
-    printf("Midpoint fixo em %d m | offset de %d a %d m | passo de offset = %d m\n", M_m, offset_min_m, offset_min_m + (Ncmp - 1) * step_m, step_m);
+    // Meio espacamento: usado para afastar o par 0 do centro, para que o
+    // primeiro offset ja nasca em spacing_m (ex: 50 m) em vez de zero.
+    int half_spacing_grid = spacing_grid / 2;
+
+    if (spacing_grid % 2 != 0)
+    {
+        printf("Aviso: spacing_grid=%d e impar, half_spacing_grid=%d nao reproduz exatamente %.1f m de offset inicial\n",
+               spacing_grid, half_spacing_grid, spacing_m / 2.0);
+    }
 
     //-------------------------------
     // Aloca arrays de fontes e receptores (indices de GRID, sem Nboudary)
     //-------------------------------
-
-    int *sx = (int *)malloc(Ncmp * sizeof(int));
-    int *sz = (int *)malloc(Ncmp * sizeof(int));
-    int *rx = (int *)malloc(Ncmp * sizeof(int));
-    int *rz = (int *)malloc(Ncmp * sizeof(int));
+    
+    int *sx = (int *)malloc(Nsource * sizeof(int));
+    int *sz = (int *)malloc(Nsource * sizeof(int));
+    int *rx = (int *)malloc(Nrec * sizeof(int));
+    int *rz = (int *)malloc(Nrec * sizeof(int));
 
     if (sx == NULL || sz == NULL || rx == NULL || rz == NULL)
     {
@@ -87,33 +101,54 @@ int main()
         return 1;
     }
 
-    int sz_grid = depth_source_m / dz;
-    int rz_grid = depth_rec_m / dz;
-
-    for (int i = 0; i < Ncmp; i++)
+    // Fontes: partindo de meio-espacamento a esquerda do centro, espalhando para a ESQUERDA
+    for (int i = 0; i < Nsource; i++)
     {
-
-        int offset_m = offset_min_m + i * step_m;
-
-        int sx_m = M_m + offset_m / 2; // fonte fica a direita do midpoint
-        int rx_m = M_m - offset_m / 2; // receptor fica a esquerda do midpoint
-
-        sx[i] = sx_m / dx; // metros -> ponto de grid
-        rx[i] = rx_m / dx;
-
+        sx[i] = mid_x - half_spacing_grid - i * spacing_grid;
         sz[i] = sz_grid;
+    }
+
+    // Receptores: partindo de meio-espacamento a direita do centro, espalhando para a DIREITA
+    for (int i = 0; i < Nrec; i++)
+    {
+        rx[i] = mid_x + half_spacing_grid + i * spacing_grid;
         rz[i] = rz_grid;
     }
 
-    int Nsource = Ncmp;
-    int Nrec = Ncmp;
+    // Checagem de limites do modelo
+    for (int i = 0; i < Nsource; i++)
+    {
+        if (sx[i] < 0 || sx[i] >= nx)
+        {
+            printf("Erro: fonte %d fora do modelo (sx=%d, nx=%d)\n", i, sx[i], nx);
+            free(sx);
+            free(sz);
+            free(rx);
+            free(rz);
+            return 1;
+        }
+    }
+    for (int i = 0; i < Nrec; i++)
+    {
+        if (rx[i] < 0 || rx[i] >= nx)
+        {
+            printf("Erro: receptor %d fora do modelo (rx=%d, nx=%d)\n", i, rx[i], nx);
+            free(sx);
+            free(sz);
+            free(rx);
+            free(rz);
+            return 1;
+        }
+    }
 
-    printf("Nsource = %d, Nrec = %d (pontos de grid, SEM borda de absorcao)\n", Nsource, Nrec);
+    printf("Meio do modelo em x = %d (grid) | dx = %.2f m\n", mid_x, dx);
+    printf("Espacamento fonte/receptor = %.1f m (%d pontos de grid)\n", spacing_m, spacing_grid);
+    printf("Fontes: x=%d ate x=%d (indo para a esquerda), profundidade z=%d\n", sx[0], sx[Nsource - 1], sz_grid);
+    printf("Receptores: x=%d ate x=%d (indo para a direita), profundidade z=%d\n", rx[0], rx[Nrec - 1], rz_grid);
 
     //----------------------------------
     // SOURCES DATA in csv (indices de GRID, sem Nboudary)
     //----------------------------------
-
     FILE *file_sources = fopen("/home/processamento/acustica_2D/inputs/sources.csv", "w");
     if (file_sources == NULL)
     {
@@ -124,18 +159,14 @@ int main()
         free(rz);
         return 1;
     }
-
     fprintf(file_sources, "index,coordx,coordz\n");
     for (int i = 0; i < Nsource; i++)
-    {
         fprintf(file_sources, "%d,%d,%d\n", i, sx[i], sz[i]);
-    }
     fclose(file_sources);
 
     //----------------------------------
     // RECEIVERS DATA in csv (indices de GRID, sem Nboudary)
     //----------------------------------
-
     FILE *file_receivers = fopen("/home/processamento/acustica_2D/inputs/receivers.csv", "w");
     if (file_receivers == NULL)
     {
@@ -146,41 +177,37 @@ int main()
         free(rz);
         return 1;
     }
-
     fprintf(file_receivers, "index,coordx,coordz\n");
     for (int i = 0; i < Nrec; i++)
-    {
         fprintf(file_receivers, "%d,%d,%d\n", i, rx[i], rz[i]);
-    }
     fclose(file_receivers);
 
     //----------------------------------
-    // OFFSET/MIDPOINT DATA in csv (para conferencia e para usar no mute depois)
+    // PARES FONTE-RECEPTOR (offset/midpoint) DATA in csv
     //----------------------------------
-
-    FILE *file_cmp = fopen("/home/processamento/acustica_2D/inputs/cmp_geometry.csv", "w");
-    if (file_cmp == NULL)
+    FILE *file_pairs = fopen("/home/processamento/acustica_2D/inputs/pares_geometry.csv", "w");
+    if (file_pairs == NULL)
     {
-        printf("Erro ao abrir cmp_geometry.csv\n");
+        printf("Erro ao abrir pares_geometry.csv\n");
         free(sx);
         free(sz);
         free(rx);
         free(rz);
         return 1;
     }
-
-    fprintf(file_cmp, "shot,sx_m,rx_m,offset_m,midpoint_m\n");
-    for (int i = 0; i < Ncmp; i++)
+    fprintf(file_pairs, "par,sx_m,rx_m,offset_m,midpoint_m\n");
+    int Npairs = (Nsource < Nrec) ? Nsource : Nrec;
+    for (int i = 0; i < Npairs; i++)
     {
-        int sx_m = sx[i] * dx;
-        int rx_m = rx[i] * dx;
-        int offset_m = sx_m - rx_m;
-        int midpoint_m = (sx_m + rx_m) / 2;
-        fprintf(file_cmp, "%d,%d,%d,%d,%d\n", i, sx_m, rx_m, offset_m, midpoint_m);
+        double sx_m = sx[i] * dx;
+        double rx_m = rx[i] * dx;
+        double offset_m = rx_m - sx_m;
+        double midpoint_m = (sx_m + rx_m) / 2.0;
+        fprintf(file_pairs, "%d,%.1f,%.1f,%.1f,%.1f\n", i, sx_m, rx_m, offset_m, midpoint_m);
     }
-    fclose(file_cmp);
+    fclose(file_pairs);
 
-    printf("Arquivos sources.csv, receivers.csv e cmp_geometry.csv gerados com sucesso.\n");
+    printf("Arquivos sources.csv, receivers.csv e pares_geometry.csv gerados com sucesso.\n");
 
     free(sx);
     free(sz);

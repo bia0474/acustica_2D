@@ -482,7 +482,7 @@ plt.show()
 # Plot the sismogram
 #----------------------------------
 
-data = np.fromfile("/home/processamento/acustica_2D/outputs/seismogram.bin", dtype=np.float32)
+data = np.fromfile("/home/processamento/acustica_2D/outputs/seismogram_shot0.bin", dtype=np.float32)
 
 seismogram = data.reshape((nrec, nt), order="C")
 
@@ -834,3 +834,26 @@ ax.margins(y=0)
 plt.tight_layout()
 plt.show()
 '''
+
+#----------------------------------
+# Plot the seismic trace
+#----------------------------------
+
+dt = 0.000500
+shot_idx = 20
+
+fname = f"/home/processamento/acustica_2D/outputs/seismogram_shot{shot_idx}.bin"  # sem zero-padding, igual ao C++ (to_string)
+
+data = np.fromfile(fname, dtype=np.float32)
+nt_real = data.shape[0]
+print("Amostras lidas:", nt_real)
+
+t = np.arange(nt_real) * dt
+
+plt.figure(figsize=(10, 4))
+plt.plot(t, data, color="black", linewidth=0.8)
+plt.xlabel("Tempo (s)")
+plt.ylabel("Amplitude")
+plt.title(f"Sismograma - Fonte {shot_idx}")
+plt.tight_layout()
+plt.show()

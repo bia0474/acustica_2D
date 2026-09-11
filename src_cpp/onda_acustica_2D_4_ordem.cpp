@@ -511,6 +511,13 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     {
         std::fill(u_curr, u_curr + nx_abc * nz_abc, 0.0f);
         std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f);
+        std::fill(seismogram_shot, seismogram_shot + nt, 0.0f);
+        std::fill(px_fwd, px_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(pz_fwd, pz_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(pt_fwd, pt_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
+
 
         for (int n = 1; n < nt; n++)
         { // each iteration calculates the wave at the next instant
@@ -541,7 +548,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     // Poynting vectors + Optical Flow
                     //----------------------------------
 
-                    if (n % 1000 == 0)
+                    if (n % 10 == 0)
                     {
                         float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i]) / dt;
 
@@ -565,7 +572,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             // Using Optical Flow method (20 iterations over the entire mesh)
             //---------------------------------------------------------------
 
-            if (n % 1000 == 0)
+            if (n % 10 == 0)
             {
 
                 std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
@@ -605,7 +612,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             }
 
             //----------------------------------
-            // source injection (uma fonte só, a do tiro atual)
+            // source injection (uma fonte só)
             //----------------------------------
 
             u_next[sx[shot] * nz_abc + sz[shot]] += (fonte[n]) / (dx * dz);
@@ -687,13 +694,13 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 std::cout << "Saving the file of the snapshots and PVs + OF of the forward!" << std::endl;
             }
 
-            if (n % 1000 == 0)
+            if (n % 10 == 0)
             {
 
-                std::ofstream file_fwd("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(n) + ".bin", std::ios::binary);
+                std::ofstream file_fwd("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
-                std::ofstream file_PVxOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x" + std::to_string(n) + ".bin", std::ios::binary);
-                std::ofstream file_PVzOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z" + std::to_string(n) + ".bin", std::ios::binary);
+                std::ofstream file_PVxOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ofstream file_PVzOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 for (int x = Nboudary; x < nx_abc - Nboudary; x++)
                 {
@@ -735,22 +742,17 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         file.close();
 
         std::cout << "Sismograma do tiro " << shot << " salvo em " << filename << "\n";
-    }
 
-    /*
-    //-----------------------------------
-    // Direct Wave Mute
-    //-----------------------------------
+        //-----------------------------------
+        // Direct Wave Mute 
+        //-----------------------------------
 
-    float v_direct = 1500.0f;   // direct wave velocity (m/s)
-    float shift     = 0.50f;    // delay after the arrival of the direct wave(s)
-    float window    = 0.1f;    // ramp duration (s)
+        float v_direct = 1500.0f;
+        float shift    = 0.50f;
+        float window   = 0.1f;
 
-    #pragma omp parallel for
-    for (int r = 0; r < nrec; r++)
-    {
-        float dz_rec = (receivers[r].z - sz[0]) * dz;
-        float dx_rec = (receivers[r].x - sx[0]) * dx;
+        float dz_rec = (receivers[shot].z - sz[shot]) * dz;
+        float dx_rec = (receivers[shot].x - sx[shot]) * dx;
 
         float dist = std::sqrt(dz_rec * dz_rec + dx_rec * dx_rec);
 
@@ -765,29 +767,32 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             if (t < t1)
             {
-                seismogram[r * nt + it] = 0.0f;
+                seismogram_shot[it] = 0.0f;
             }
             else if (t < t2)
             {
-                seismogram[r * nt + it] *= (t - t1) / (t2 - t1);
+                seismogram_shot[it] *= (t - t1) / (t2 - t1);
             }
         }
+
+        //------------------------------------------------------------------
+        // salva o sismograma deste tiro COM MUTE, em arquivo separado
+        //------------------------------------------------------------------
+
+        std::string filename_mute = "/home/processamento/acustica_2D/outputs/seismogram_shot" + std::to_string(shot) + "_mute.bin";
+
+        std::ofstream file_mute(filename_mute, std::ios::binary);
+
+        if(!file_mute.is_open()){
+            std::cout << "Erro ao abrir " << filename_mute << "\n";
+            exit(1);
+        }
+
+        file_mute.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
+        file_mute.close();
+
+        std::cout << "Sismograma do tiro " << shot << " COM MUTE salvo em " << filename_mute << "\n";
     }
-
-    //----------------------------------------------
-    // SAVE THE DOCUMENT OF THE SISMOGRAM WITH MUTE
-    //----------------------------------------------
-
-    std::cout << "Saving the seismogram binary file!" << std::endl;
-
-    std::ofstream file_mute("/home/processamento/acustica_2D/outputs/seismogram_mute.bin", std::ios::binary);
-
-    file_mute.write(reinterpret_cast<char *>(seismogram), nrec * nt * sizeof(float));
-
-    file_mute.close();
-
-    std::cout << "Seismogram binary file saved!" << std::endl;
-    */
 
     //-----------------------------------
     // SAVE the copy of the final field
