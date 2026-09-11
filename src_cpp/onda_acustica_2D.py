@@ -4,6 +4,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from scipy.stats import pearsonr
 from matplotlib.colors import Normalize
 from scipy.ndimage import laplace
+import pandas as pd
 
 #----------------------------------
 # PARAMETERS
@@ -50,7 +51,7 @@ plt.ylabel("z (m)")
 plt.title("Wavefield Snapshot")
 
 plt.show()
-'''
+
 
 #----------------------------------
 # plot two snapshots side by side
@@ -92,7 +93,7 @@ plt.tight_layout()
 
 plt.show()
 
-'''
+
 #--------------------------------------------------------
 # plot the PVxz and PVOFxz to the snapshot corresponding
 #--------------------------------------------------------
@@ -393,7 +394,7 @@ plt.show()
 vel = np.fromfile("/home/processamento/acustica_2D/inputs/velocityModel.bin", dtype=np.float32)
 vel = vel.reshape((nx, nz))  # mesma ordem row-major usada no C++ (c[i * nz_abc + j])
 
-plt.figure(figsize=(8,6))
+plt.figure(figsize=(12,4))
 
 plt.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
 
@@ -404,6 +405,55 @@ plt.ylabel("z (m)")
 
 plt.title("Velocity Model")
 
+plt.show()
+
+#-----------------------------
+# Plot do model + geometria
+#-----------------------------
+
+#-----------------------------------
+# Lendo modelo de velocidades
+#-----------------------------------
+
+vel = np.fromfile("/home/processamento/acustica_2D/inputs/velocityModel.bin", dtype=np.float32).reshape(nx, nz)
+
+#-----------------------------------
+# Le a geometria de fontes e receptores (indices de grid, sem Nboundary)
+#-----------------------------------
+
+sources   = pd.read_csv("/home/processamento/acustica_2D/inputs/sources.csv")
+receivers = pd.read_csv("/home/processamento/acustica_2D/inputs/receivers.csv")
+
+src_x = sources["coordx"].values * dx
+src_z = sources["coordz"].values * dz
+
+rec_x = receivers["coordx"].values * dx
+rec_z = receivers["coordz"].values * dz
+
+#--------------------------------------------
+# imagem do modelo com a geometria sobreposta
+#--------------------------------------------
+
+fig, ax = plt.subplots(figsize=(12, 4))  
+
+im = ax.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], cmap="viridis", aspect="auto")
+
+# linhas ligando cada par fonte-receptor, pra visualizar o offset/midpoint do CMP
+for i in range(len(src_x)):
+    ax.plot([src_x[i], rec_x[i]], [src_z[i], rec_z[i]], color="white", linewidth=0.5, alpha=0.5, zorder=4)
+
+ax.scatter(rec_x, rec_z, marker="v", color="green", s=40, label=f"Receivers (n={len(rec_x)})", zorder=5)
+ax.scatter(src_x, src_z, marker="*", color="yellow", s=150, edgecolor="k", linewidth=0.6, label=f"Sources (n={len(src_x)})", zorder=6)
+
+ax.set_xlabel("Distância (m)")
+ax.set_ylabel("Profundidade (m)")
+ax.set_title("Geometria CMP sobre o modelo de velocidades")
+ax.legend(loc="lower right", fontsize=9, framealpha=0.9)
+
+cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+cbar.set_label("Velocidade (m/s)")
+
+plt.tight_layout()
 plt.show()
 
 '''
@@ -427,7 +477,7 @@ plt.ylabel("z (m)")
 plt.title("Velocity Model")
 
 plt.show()
-'''
+
 #----------------------------------
 # Plot the sismogram
 #----------------------------------
@@ -587,7 +637,7 @@ fig3.colorbar(sm, ax=ax3, fraction=0.046, pad=0.04)
 plt.tight_layout()
 
 plt.show()
-'''
+
 #----------------------------------
 # image of the ADCIGs
 #----------------------------------
@@ -686,7 +736,7 @@ ax.margins(y=0)
 plt.tight_layout()
 
 plt.show()
-'''
+
 
 #-----------------------------------------------
 # image of the ADCIGs (Density + Wiggle overlay)
@@ -783,3 +833,4 @@ ax.margins(y=0)
 
 plt.tight_layout()
 plt.show()
+'''

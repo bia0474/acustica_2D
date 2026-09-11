@@ -541,7 +541,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     // Poynting vectors + Optical Flow
                     //----------------------------------
 
-                    if (n % 10 == 0)
+                    if (n % 1000 == 0)
                     {
                         float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i]) / dt;
 
@@ -565,7 +565,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             // Using Optical Flow method (20 iterations over the entire mesh)
             //---------------------------------------------------------------
 
-            if (n % 10 == 0)
+            if (n % 1000 == 0)
             {
 
                 std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
@@ -687,7 +687,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 std::cout << "Saving the file of the snapshots and PVs + OF of the forward!" << std::endl;
             }
 
-            if (n % 10 == 0)
+            if (n % 1000 == 0)
             {
 
                 std::ofstream file_fwd("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(n) + ".bin", std::ios::binary);

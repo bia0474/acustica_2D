@@ -34,34 +34,6 @@ int *linspace(int start, int end, int quantity, int endpoint)
     return number;
 }
 
-//----------------------------------
-// Gera array de pontos de GRID, a partir de posicoes em metros
-// start_m, end_m, step_m: em metros
-// dx: espacamento do grid em metros/ponto
-// count: recebe a quantidade de pontos gerados
-//----------------------------------
-
-int *arange_gridpoints(int start_m, int end_m, int step_m, int dx, int *count)
-{
-
-    int start_grid = start_m / dx;
-    int end_grid = end_m / dx;
-    int step_grid = step_m / dx;
-
-    *count = (end_grid - start_grid) / step_grid + 1;
-
-    int *arr = (int *)malloc((*count) * sizeof(int));
-    if (arr == NULL)
-        return NULL;
-
-    for (int i = 0; i < *count; i++)
-    {
-        arr[i] = start_grid + i * step_grid;
-    }
-
-    return arr;
-}
-
 int main()
 {
 
@@ -73,85 +45,68 @@ int main()
     int dz = 10; // m/ponto de grid em z
 
     //-------------------------------
-    // Sources - de 5000m a 10000m, passo 50m
+    // Parametros do CMP: midpoint fixo, offset variando
     //-------------------------------
 
-    int sx_init_m = 5000;
-    int sx_end_m = 10000;
-    int step_m = 50;
+    int M_m = 5000;          // midpoint em metros (centro do modelo)
+    int offset_min_m = 200;  // menor afastamento fonte-receptor, em metros
+    int offset_max_m = 7600; // maior afastamento fonte-receptor, em metros
+    int Ncmp = 20;           // quantidade de pares (fold do CMP)
+
     int depth_source_m = 100; // profundidade da fonte em metros
+    int depth_rec_m = 100;    // profundidade do receptor em metros
 
-    int Nsource;
-    int *sx = arange_gridpoints(sx_init_m, sx_end_m, step_m, dx, &Nsource);
+    // passo de offset, forcado a multiplo de 2*dx para sx/rx carem em ponto de grid exato
+    int step_m = (offset_max_m - offset_min_m) / (Ncmp - 1);
+    step_m = (step_m / (2 * dx)) * (2 * dx); // arredonda para baixo, multiplo de 2*dx
 
-    if (sx == NULL)
+    if (step_m <= 0)
     {
-        printf("Erro ao alocar memoria (sx)\n");
+        printf("Erro: intervalo de offset muito pequeno para Ncmp=%d pontos com dx=%d\n", Ncmp, dx);
         return 1;
     }
 
-    int *sz = (int *)malloc(Nsource * sizeof(int));
-    if (sz == NULL)
+    printf("Midpoint fixo em %d m | offset de %d a %d m | passo de offset = %d m\n", M_m, offset_min_m, offset_min_m + (Ncmp - 1) * step_m, step_m);
+
+    //-------------------------------
+    // Aloca arrays de fontes e receptores (indices de GRID, sem Nboudary)
+    //-------------------------------
+
+    int *sx = (int *)malloc(Ncmp * sizeof(int));
+    int *sz = (int *)malloc(Ncmp * sizeof(int));
+    int *rx = (int *)malloc(Ncmp * sizeof(int));
+    int *rz = (int *)malloc(Ncmp * sizeof(int));
+
+    if (sx == NULL || sz == NULL || rx == NULL || rz == NULL)
     {
-        printf("Erro ao alocar memoria (sz)\n");
-        free(sx);
-        return 1;
-    }
-
-    int sz_grid = depth_source_m / dz;
-    for (int i = 0; i < Nsource; i++)
-    {
-        sz[i] = sz_grid;
-    }
-
-    //----------------------------------
-    // RECEIVERS - de 0m a 5000m, passo 50m
-    //----------------------------------
-
-    int rx_init_m = 0;
-    int rx_end_m = 5000;
-    int depth_rec_m = 100; // profundidade do receptor em metros
-
-    int Nrec;
-    int *rx = arange_gridpoints(rx_init_m, rx_end_m, step_m, dx, &Nrec);
-
-    if (rx == NULL)
-    {
-        printf("Erro ao alocar memoria (rx)\n");
-        free(sx);
-        free(sz);
-        return 1;
-    }
-
-    int *rz = (int *)malloc(Nrec * sizeof(int));
-    if (rz == NULL)
-    {
-        printf("Erro ao alocar memoria (rz)\n");
-        free(sx);
-        free(sz);
-        free(rx);
-        return 1;
-    }
-
-    int rz_grid = depth_rec_m / dz;
-    for (int i = 0; i < Nrec; i++)
-    {
-        rz[i] = rz_grid;
-    }
-
-    //----------------------------------
-    // Checagem de consistencia (pareamento 1 a 1)
-    //----------------------------------
-
-    if (Nsource != Nrec)
-    {
-        printf("Erro: Nsource (%d) e Nrec (%d) precisam ser iguais para o pareamento 1 a 1.\n", Nsource, Nrec);
+        printf("Erro ao alocar memoria\n");
         free(sx);
         free(sz);
         free(rx);
         free(rz);
         return 1;
     }
+
+    int sz_grid = depth_source_m / dz;
+    int rz_grid = depth_rec_m / dz;
+
+    for (int i = 0; i < Ncmp; i++)
+    {
+
+        int offset_m = offset_min_m + i * step_m;
+
+        int sx_m = M_m + offset_m / 2; // fonte fica a direita do midpoint
+        int rx_m = M_m - offset_m / 2; // receptor fica a esquerda do midpoint
+
+        sx[i] = sx_m / dx; // metros -> ponto de grid
+        rx[i] = rx_m / dx;
+
+        sz[i] = sz_grid;
+        rz[i] = rz_grid;
+    }
+
+    int Nsource = Ncmp;
+    int Nrec = Ncmp;
 
     printf("Nsource = %d, Nrec = %d (pontos de grid, SEM borda de absorcao)\n", Nsource, Nrec);
 
@@ -199,7 +154,33 @@ int main()
     }
     fclose(file_receivers);
 
-    printf("Arquivos sources.csv e receivers.csv gerados com sucesso.\n");
+    //----------------------------------
+    // OFFSET/MIDPOINT DATA in csv (para conferencia e para usar no mute depois)
+    //----------------------------------
+
+    FILE *file_cmp = fopen("/home/processamento/acustica_2D/inputs/cmp_geometry.csv", "w");
+    if (file_cmp == NULL)
+    {
+        printf("Erro ao abrir cmp_geometry.csv\n");
+        free(sx);
+        free(sz);
+        free(rx);
+        free(rz);
+        return 1;
+    }
+
+    fprintf(file_cmp, "shot,sx_m,rx_m,offset_m,midpoint_m\n");
+    for (int i = 0; i < Ncmp; i++)
+    {
+        int sx_m = sx[i] * dx;
+        int rx_m = rx[i] * dx;
+        int offset_m = sx_m - rx_m;
+        int midpoint_m = (sx_m + rx_m) / 2;
+        fprintf(file_cmp, "%d,%d,%d,%d,%d\n", i, sx_m, rx_m, offset_m, midpoint_m);
+    }
+    fclose(file_cmp);
+
+    printf("Arquivos sources.csv, receivers.csv e cmp_geometry.csv gerados com sucesso.\n");
 
     free(sx);
     free(sz);
