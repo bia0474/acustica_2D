@@ -8,6 +8,36 @@
 #include <omp.h>
 #include <time.h>
 
+
+
+//----------------------------------
+// CFL condition
+//----------------------------------
+
+bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //function of the stability codition
+
+    float cmax = 0.0f;
+
+
+    for(int i = 0; i < nx; i++){
+
+        for(int j = 0; j < nz; j++){
+
+            cmax = std::max(cmax, c[i * nz + j]);
+        }
+    }
+
+    float courant = cmax * dt / dx;
+
+    if(courant > 0.7f){
+
+        std::cout << "ERROR! NOT STABLE" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 //-------------------------------
 // Struct of the receivers
 //-------------------------------
@@ -829,6 +859,19 @@ int main()
     if (!checkGeometry(sx, sz, Nsource, receivers, nrec, nx, nz, Nboudary))
     {
         return 1;
+    }
+
+    //----------------------------------
+    // CFL check
+    //----------------------------------
+
+    if(CFL(c, dt, dx, dz, nx, nz)){
+
+        std::cout << "Stable simulation" << std::endl;
+    }
+    else{
+
+        std::cout << "unstable simulation" << std::endl;
     }
 
     //-----------------------------------------

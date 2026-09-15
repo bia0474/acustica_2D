@@ -56,6 +56,7 @@ bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //functi
 
     return true;
 }
+
 int main(){
 
     //----------------------------------

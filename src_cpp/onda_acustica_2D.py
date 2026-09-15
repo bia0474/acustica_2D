@@ -94,6 +94,67 @@ plt.tight_layout()
 
 plt.show()
 
+#--------------------------------------------------------
+# plot do snapshot + vetores de Poynting (Optical Flow)
+# para o campo da fonte (fwd) e o campo do receptor (back)
+#--------------------------------------------------------
+
+# --- campo da fonte (forward) ---
+PVx_of_src = np.fromfile("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x2500.bin", dtype=np.float32).reshape((nx, nz))
+PVz_of_src = np.fromfile("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z2500.bin", dtype=np.float32).reshape((nx, nz))
+wavefield_src = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_fwd_2500.bin", dtype=np.float32).reshape((nx, nz))
+
+# --- campo do receptor (backward) ---
+PVx_of_rec = np.fromfile("/home/processamento/acustica_2D/outputs/PV+OF_back_x2500.bin", dtype=np.float32).reshape((nx, nz))
+PVz_of_rec = np.fromfile("/home/processamento/acustica_2D/outputs/PV+OF_back_z2500.bin", dtype=np.float32).reshape((nx, nz))
+wavefield_rec = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_back_2500.bin", dtype=np.float32).reshape((nx, nz))
+
+x = np.arange(nx) * dx
+z = np.arange(nz) * dz
+X, Z = np.meshgrid(x, z, indexing='ij')
+
+step = 30  # menos denso
+
+# função de plotagem com cor por direção (agora recebe o wavefield do próprio campo)
+
+def plot_panel(ax, wavefield, Vx, Vz, title):
+
+    ax.imshow(wavefield.T, cmap="gray", origin="upper", extent=[0, nx*dx, nz*dz, 0], interpolation="bilinear", aspect="auto")
+
+    Xs = X[::step, ::step]
+    Zs = Z[::step, ::step]
+
+    Vx_s = Vx[::step, ::step]
+    Vz_s = Vz[::step, ::step]
+
+    # normalização para vetor unitário
+    norm = np.sqrt(Vx_s**2 + Vz_s**2)
+    norm[norm == 0] = np.nan  # evita divisão por zero; NaN faz o quiver ignorar essas setas
+
+    Vxs = Vx_s / norm
+    Vzs = -Vz_s / norm  # mesmo sinal invertido que você já usava
+
+    # separa por direção: vermelho = descendo (Vz>0 no eixo original), verde = subindo
+    mask_down = Vz_s > 0
+    mask_up   = ~mask_down
+
+    ax.quiver(Xs[mask_down], Zs[mask_down], Vxs[mask_down], Vzs[mask_down], color='red', pivot='mid', scale=40, width=0.003)
+    ax.quiver(Xs[mask_up], Zs[mask_up], Vxs[mask_up], Vzs[mask_up], color='lime', pivot='mid', scale=40, width=0.003)
+
+    ax.set_title(title)
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("z (m)")
+
+# figura com 2 painéis: campo da fonte | campo do receptor
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+plot_panel(axes[0], wavefield_src, PVx_of_src, PVz_of_src, "(a) Campo da fonte (forward) — OF")
+plot_panel(axes[1], wavefield_rec, PVx_of_rec, PVz_of_rec, "(b) Campo do receptor (backward) — OF")
+
+plt.tight_layout()
+plt.show()
+
 
 #--------------------------------------------------------
 # plot the PVxz and PVOFxz to the snapshot corresponding
@@ -892,7 +953,6 @@ plt.ylabel("Tempo (s)")
 plt.title("Sismograma completo (todos os pares fonte-receptor)")
 plt.colorbar(label="Amplitude")
 plt.tight_layout()
-plt.savefig("sismograma_completo.png", dpi=150)
 plt.show()
 
 #----------------------------------
@@ -958,7 +1018,6 @@ plt.ylabel("Tempo (s)")
 plt.title("Sismograma completo (CMP)")
 plt.colorbar(label="Amplitude")
 plt.tight_layout()
-plt.savefig("sismograma_completo.png", dpi=150)
 plt.show()
 
 #------------------------------------
@@ -1001,5 +1060,4 @@ plt.ylabel("Tempo (s)")
 plt.title("Sismograma completo (CMP) com MUTE")
 plt.colorbar(label="Amplitude")
 plt.tight_layout()
-plt.savefig("sismograma_completo.png", dpi=150)
 plt.show()
