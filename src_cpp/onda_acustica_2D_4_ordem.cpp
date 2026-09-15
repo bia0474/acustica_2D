@@ -481,17 +481,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     float *u_next = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // future field of the fwd
 
     //----------------------------------
-    // Poynting vector + Optical Flow
-    //----------------------------------
-
-    float *px_fwd = (float *)calloc(nx_abc * nz_abc, sizeof(float));
-    float *pz_fwd = (float *)calloc(nx_abc * nz_abc, sizeof(float));
-    float *pt_fwd = (float *)calloc(nx_abc * nz_abc, sizeof(float));
-
-    float *ux_fwd = (float *)calloc(nx_abc * nz_abc, sizeof(float));
-    float *uz_fwd = (float *)calloc(nx_abc * nz_abc, sizeof(float));
-
-    //----------------------------------
     // SEISMOGRAM
     //----------------------------------
     // Nshots pares, cada um com nt amostras
@@ -507,17 +496,18 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     std::cout << "Starting the temporal and spacial loops of the forward!" << std::endl;
 
+    //-----------------------------------
+    // abre os arquivos do CMP UMA VEZ
+    //-----------------------------------
+
+    std::ofstream file_cmp("/home/processamento/acustica_2D/outputs/cmp_gather.bin", std::ios::binary);
+    std::ofstream file_cmp_mute("/home/processamento/acustica_2D/outputs/cmp_gather_mute.bin", std::ios::binary);
+
     for (int shot = 0; shot < Nshots; shot++)
     {
         std::fill(u_curr, u_curr + nx_abc * nz_abc, 0.0f);
         std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f);
         std::fill(seismogram_shot, seismogram_shot + nt, 0.0f);
-        std::fill(px_fwd, px_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(pz_fwd, pz_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(pt_fwd, pt_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
-
 
         for (int n = 1; n < nt; n++)
         { // each iteration calculates the wave at the next instant
@@ -543,71 +533,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                     u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
                     
-
-                    //----------------------------------
-                    // Poynting vectors + Optical Flow
-                    //----------------------------------
-
-                    if (n % 10 == 0)
-                    {
-                        float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i]) / dt;
-
-                        float Ux = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i]) / (12 * dx);
-
-                        float Uz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)]) / (12 * dz);
-
-                        //--------------------------------------
-                        // saves the derivatives to Optical Flow
-                        //--------------------------------------
-
-                        px_fwd[j * nz_abc + i] = Ux;
-                        pz_fwd[j * nz_abc + i] = Uz;
-                        pt_fwd[j * nz_abc + i] = dUdt;
-                    }
-
-                }
-            }
-
-            //---------------------------------------------------------------
-            // Using Optical Flow method (20 iterations over the entire mesh)
-            //---------------------------------------------------------------
-
-            if (n % 10 == 0)
-            {
-
-                std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
-                std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
-
-                int n_iter = 20;
-                float alpha = 1.0f;
-
-                for (int iter = 0; iter < n_iter; iter++)
-                {
-                    for (int j = 2; j < nx_abc - 2; j++)
-                    {
-                        for (int i = 2; i < nz_abc - 2; i++)
-                        {
-                            float somaux_fwd = 0.0f;
-                            float somauz_fwd = 0.0f;
-
-                            for (int a = -1; a <= 1; a++)
-                            {
-                                for (int b = -1; b <= 1; b++)
-                                {
-                                    somaux_fwd += ux_fwd[(j + a) * nz_abc + (i + b)];
-                                    somauz_fwd += uz_fwd[(j + a) * nz_abc + (i + b)];
-                                }
-                            }
-
-                            float ux_fwd_average = (1.0f / 12.0f) * (ux_fwd[j * nz_abc + i - nz_abc] + ux_fwd[j * nz_abc + i + nz_abc] + ux_fwd[j * nz_abc + i - 1] + ux_fwd[j * nz_abc + i + 1] - ux_fwd[j * nz_abc + i] + somaux_fwd);
-                            float uz_fwd_average = (1.0f / 12.0f) * (uz_fwd[j * nz_abc + i - nz_abc] + uz_fwd[j * nz_abc + i + nz_abc] + uz_fwd[j * nz_abc + i - 1] + uz_fwd[j * nz_abc + i + 1] - uz_fwd[j * nz_abc + i] + somauz_fwd);
-
-                            float denominator_fwd = alpha * alpha + px_fwd[j * nz_abc + i] * px_fwd[j * nz_abc + i] + pz_fwd[j * nz_abc + i] * pz_fwd[j * nz_abc + i];
-
-                            ux_fwd[j * nz_abc + i] = ux_fwd_average - (px_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
-                            uz_fwd[j * nz_abc + i] = uz_fwd_average - (pz_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
-                        }
-                    }
                 }
             }
 
@@ -686,12 +611,12 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             seismogram_shot[n] = u_next[xr * nz_abc + zr];
             
             //-------------------------------------------------------
-            // SAVE ALL THE SNAPSHOT HERE WITH PVxz (binary document)
+            // SAVE ALL THE SNAPSHOT HERE (binary document)
             //-------------------------------------------------------
 
             if (n == 1)
             {
-                std::cout << "Saving the file of the snapshots and PVs + OF of the forward!" << std::endl;
+                std::cout << "Saving the file of the snapshots of the forward!" << std::endl;
             }
 
             if (n % 10 == 0)
@@ -699,22 +624,14 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                 std::ofstream file_fwd("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
-                std::ofstream file_PVxOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-                std::ofstream file_PVzOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-
                 for (int x = Nboudary; x < nx_abc - Nboudary; x++)
                 {
 
                     file_fwd.write(reinterpret_cast<char *>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
 
-                    file_PVxOF_fwd.write(reinterpret_cast<char *>(&ux_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
-
-                    file_PVzOF_fwd.write(reinterpret_cast<char *>(&uz_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
                 }
 
                 file_fwd.close();
-                file_PVxOF_fwd.close();
-                file_PVzOF_fwd.close();
             }
             
             //----------------------------------
@@ -742,6 +659,12 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         file.close();
 
         std::cout << "Sismograma do tiro " << shot << " salvo em " << filename << "\n";
+        
+        //-----------------------------------
+        // salva um gather do CMP sem mute
+        //-----------------------------------
+
+        file_cmp.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
 
         //-----------------------------------
         // Direct Wave Mute 
@@ -788,11 +711,29 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             exit(1);
         }
 
-        file_mute.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
+        file_mute.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));  
+
         file_mute.close();
 
         std::cout << "Sismograma do tiro " << shot << " COM MUTE salvo em " << filename_mute << "\n";
+
+        //-----------------------------------
+        // salva um gather do CMP com mute
+        //-----------------------------------
+
+        file_cmp_mute.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
+
     }
+
+    //-----------------------------------
+    // fecha os arquivos do CMP DEPOIS 
+    //-----------------------------------
+
+    file_cmp.close();
+    file_cmp_mute.close();
+
+    std::cout << "CMP gather (sem mute) salvo em cmp_gather.bin" << std::endl;
+    std::cout << "CMP gather (com mute) salvo em cmp_gather_mute.bin" << std::endl;
 
     //-----------------------------------
     // SAVE the copy of the final field
@@ -808,11 +749,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     free(u_curr);
     free(u_next);
-    free(px_fwd);
-    free(pz_fwd);
-    free(pt_fwd);
-    free(ux_fwd);
-    free(uz_fwd);
     free(seismogram_shot);
 
     return result;

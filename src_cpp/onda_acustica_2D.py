@@ -5,6 +5,7 @@ from scipy.stats import pearsonr
 from matplotlib.colors import Normalize
 from scipy.ndimage import laplace
 import pandas as pd
+import os
 
 #----------------------------------
 # PARAMETERS
@@ -523,7 +524,7 @@ plt.title("Seismogram - with mute")
 plt.colorbar()
 
 plt.show()
-
+'''
 #----------------------------------
 # PLOT THE MIGRATED IMAGE
 #----------------------------------
@@ -579,20 +580,17 @@ plt.colorbar(label="Amplitude")
 plt.show()
 
 #-----------------------------------
-# Posições da fonte e dos receptores
+# Posições da fonte e dos receptores (geometria CMP, lida dos CSVs)
 #-----------------------------------
 
-src_ix, src_iz = 250, 100
+sources   = pd.read_csv("/home/processamento/acustica_2D/inputs/sources.csv")
+receivers = pd.read_csv("/home/processamento/acustica_2D/inputs/receivers.csv")
 
-src_x = src_ix * dx
-src_z = src_iz * dz
+src_x = sources["coordx"].values * dx
+src_z = sources["coordz"].values * dz
 
-rx_init = 60
-rx_end = 440
-nrec = 381
-
-rec_x = np.arange(rx_init, rx_end + 1) * dx
-rec_z = 60 * dz
+rec_x = receivers["coordx"].values * dx
+rec_z = receivers["coordz"].values * dz
 
 #----------------------------------
 # imagem sobreposta com modelo
@@ -637,7 +635,7 @@ fig3.colorbar(sm, ax=ax3, fraction=0.046, pad=0.04)
 plt.tight_layout()
 
 plt.show()
-
+'''
 #----------------------------------
 # image of the ADCIGs
 #----------------------------------
@@ -736,7 +734,7 @@ ax.margins(y=0)
 plt.tight_layout()
 
 plt.show()
-
+'''
 
 #-----------------------------------------------
 # image of the ADCIGs (Density + Wiggle overlay)
@@ -744,7 +742,7 @@ plt.show()
 
 outdir = "/home/processamento/acustica_2D/outputs"
 angle_step = 5
-n_gathers = 18
+n_gathers = 1
 
 all_bins = np.zeros((n_gathers, nx, nz), dtype=np.float32)
 
@@ -808,7 +806,7 @@ for p, ix in enumerate(x_positions):
     x0 = panel_offset
     x1 = panel_offset + n_gathers * trace_spacing
 
-    ax.imshow(panel_data, cmap="gray",vmin=-panel_max,vmax=panel_max,extent=[x0, x1, z_axis[-1], z_axis[0]],aspect="auto",origin="upper",interpolation="bilinear",   # <<< suaviza os blocos)
+    ax.imshow(panel_data, cmap="gray",vmin=-panel_max,vmax=panel_max,extent=[x0, x1, z_axis[-1], z_axis[0]],aspect="auto",origin="upper",interpolation="bilinear")   # <<< suaviza os blocos)
 
     # ---- overlay: wiggle fino por cima, reforcando os eventos ----
     for b in range(n_gathers):
@@ -833,7 +831,7 @@ ax.margins(y=0)
 
 plt.tight_layout()
 plt.show()
-'''
+
 
 #----------------------------------
 # Plot the seismic trace
@@ -842,7 +840,7 @@ plt.show()
 dt = 0.000500
 shot_idx = 0
 
-fname = f"/home/processamento/acustica_2D/outputs/seismogram_shot{shot_idx}_mute.bin"  # sem zero-padding, igual ao C++ (to_string)
+fname = f"/home/processamento/acustica_2D/outputs/seismogram_shot{shot_idx}.bin" 
 
 data = np.fromfile(fname, dtype=np.float32)
 nt_real = data.shape[0]
@@ -854,7 +852,7 @@ plt.figure(figsize=(10, 4))
 plt.plot(t, data, color="black", linewidth=0.8)
 plt.xlabel("Tempo (s)")
 plt.ylabel("Amplitude")
-plt.title(f"Sismograma - Fonte {shot_idx}")
+plt.title(f"Sismograma - Fonte {shot_idx} sem MUTE")
 plt.tight_layout()
 plt.show()
 
@@ -865,7 +863,7 @@ plt.show()
 dt = 0.000500
 n_pairs = 24
 
-pairs = pd.read_csv("/home/processamento/acustica_2D/inputs/pares_geometry.csv")  # tem colunas: par, sx_m, rx_m, offset_m, midpoint_m
+pairs = pd.read_csv("/home/processamento/acustica_2D/inputs/pares_geometry.csv")  
 
 traces = []
 for i in range(n_pairs):
@@ -880,7 +878,7 @@ data = np.stack(traces, axis=1)  # shape (nt, n_pairs)
 t = np.arange(nt_real) * dt
 offsets = pairs["offset_m"].values[:n_pairs]
 
-# ordena pelos offsets, caso os arquivos não estejam já em ordem crescente
+# ordena pelos offsets
 order = np.argsort(offsets)
 data_sorted = data[:, order]
 offsets_sorted = offsets[order]
@@ -892,6 +890,115 @@ plt.imshow(data_sorted, aspect="auto", cmap="gray", extent=[offsets_sorted.min()
 plt.xlabel("Offset (m)")
 plt.ylabel("Tempo (s)")
 plt.title("Sismograma completo (todos os pares fonte-receptor)")
+plt.colorbar(label="Amplitude")
+plt.tight_layout()
+plt.savefig("sismograma_completo.png", dpi=150)
+plt.show()
+
+#----------------------------------
+# Plot the seismic trace com MUTE
+#----------------------------------
+
+dt = 0.000500
+shot_idx = 0
+
+fname = f"/home/processamento/acustica_2D/outputs/seismogram_shot{shot_idx}_mute.bin"  
+
+data = np.fromfile(fname, dtype=np.float32)
+nt_real = data.shape[0]
+print("Amostras lidas:", nt_real)
+
+t = np.arange(nt_real) * dt
+
+plt.figure(figsize=(10, 4))
+plt.plot(t, data, color="black", linewidth=0.8)
+plt.xlabel("Tempo (s)")
+plt.ylabel("Amplitude")
+plt.title(f"Sismograma - Fonte {shot_idx} com MUTE")
+plt.tight_layout()
+plt.show()
+
+#------------------------------------
+# Sismograma completo do CMP sem MUTE
+#------------------------------------
+
+dt = 0.000500
+nt = nt_real  
+
+pairs = pd.read_csv("/home/processamento/acustica_2D/inputs/pares_geometry.csv")  
+
+fname_cmp = "/home/processamento/acustica_2D/outputs/cmp_gather.bin"
+
+n_floats = os.path.getsize(fname_cmp) // 4  # 4 bytes por float32
+
+if n_floats % nt != 0:
+    raise ValueError(f"{n_floats} amostras nao sao divisiveis por nt={nt}. Confira o valor de nt.")
+
+n_pairs = n_floats // nt
+print(f"n_pairs detectado a partir do arquivo: {n_pairs}")
+
+gather = np.fromfile(fname_cmp, dtype=np.float32).reshape(n_pairs, nt)  # (shot, tempo)
+
+data = gather.T  # transpõe para (tempo, shot), formato usado no imshow abaixo
+
+t = np.arange(nt) * dt
+offsets = pairs["offset_m"].values[:n_pairs]
+
+# ordena pelos offsets
+order = np.argsort(offsets)
+data_sorted = data[:, order]
+offsets_sorted = offsets[order]
+
+vclip = np.percentile(np.abs(data), 98)
+
+plt.figure(figsize=(9, 6))
+plt.imshow(data_sorted, aspect="auto", cmap="gray", extent=[offsets_sorted.min(), offsets_sorted.max(), t.max(), t.min()], vmin=-vclip, vmax=vclip)
+plt.xlabel("Offset (m)")
+plt.ylabel("Tempo (s)")
+plt.title("Sismograma completo (CMP)")
+plt.colorbar(label="Amplitude")
+plt.tight_layout()
+plt.savefig("sismograma_completo.png", dpi=150)
+plt.show()
+
+#------------------------------------
+# Sismograma completo do CMP com MUTE
+#------------------------------------
+
+dt = 0.000500
+nt = nt_real  # reaproveita o nt confirmado no traco individual acima
+
+pairs = pd.read_csv("/home/processamento/acustica_2D/inputs/pares_geometry.csv")  
+
+fname_cmp = "/home/processamento/acustica_2D/outputs/cmp_gather_mute.bin"
+
+n_floats = os.path.getsize(fname_cmp) // 4  # 4 bytes por float32
+
+if n_floats % nt != 0:
+    raise ValueError(f"{n_floats} amostras nao sao divisiveis por nt={nt}. Confira o valor de nt.")
+
+n_pairs = n_floats // nt
+print(f"n_pairs detectado a partir do arquivo: {n_pairs}")
+
+gather = np.fromfile(fname_cmp, dtype=np.float32).reshape(n_pairs, nt)  # (shot, tempo)
+
+data = gather.T  # transpõe para (tempo, shot), formato usado no imshow abaixo
+
+t = np.arange(nt) * dt
+offsets = pairs["offset_m"].values[:n_pairs]
+
+# ordena pelos offsets
+order = np.argsort(offsets)
+data_sorted = data[:, order]
+offsets_sorted = offsets[order]
+
+vclip = np.percentile(np.abs(data), 98)
+
+plt.figure(figsize=(9, 6))
+plt.imshow(data_sorted, aspect="auto", cmap="gray", extent=[offsets_sorted.min(), offsets_sorted.max(), t.max(), t.min()], vmin=-vclip, vmax=vclip)
+plt.xlabel("Offset (m)")
+plt.ylabel("Tempo (s)")
+plt.title("Sismograma completo (CMP) com MUTE")
 plt.colorbar(label="Amplitude")
 plt.tight_layout()
 plt.savefig("sismograma_completo.png", dpi=150)
