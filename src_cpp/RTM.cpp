@@ -515,10 +515,12 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     //----------------------------------
 
     const float angle_step = 5.0f;
-    const int n_gathers = 18;
+    const int max_angle = 90;
+    const int n_angles = max_angle / angle_step + 1; //+1 to include 0 degrees
+    const int n_gathers = 1;
 
-    float *image = (float *)calloc(n_gathers * nx * nz, sizeof(float));
-    float *image_ADCIGs = (float *)calloc(n_gathers * nx * nz, sizeof(float));
+    float *image = (float *)calloc(nx * nz, sizeof(float));
+    float *image_ADCIGs = (float *)calloc(n_angles * n_gathers * nz, sizeof(float));
     float *u_fwd_n = (float *)calloc(nx * nz, sizeof(float));
     float *ux_fwd_n = (float *)calloc(nx * nz, sizeof(float));
     float *uz_fwd_n = (float *)calloc(nx * nz, sizeof(float));
@@ -526,26 +528,13 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     float *theta = (float *)calloc(nx * nz, sizeof(float));
 
     //-----------------------------------
-    // abre o arquivo do CMP UMA VEZ, fora do loop de shots
-    //-----------------------------------
-
-    std::ifstream file_cmp("/home/processamento/acustica_2D/outputs/cmp_gather_mute.bin", std::ios::binary);
-    // (ou cmp_gather.bin, se voce quiser migrar a versao SEM mute pra comparar)
-
-    if(!file_cmp.is_open()){
-        std::cout << "Erro ao abrir cmp_gather_mute.bin\n";
-        exit(1);
-    }
-
-    //-----------------------------------
     // FORWARD FIELD
     //-----------------------------------
 
     std::cout << "Starting the temporal and spacial loops of the forward!" << std::endl;
 
-    //for (int shot = 0; shot < Nshots; shot++)
-    //{
-        int shot = 0; // for now, we will only do the first shot, to test the migration
+    for (int shot = 0; shot < Nshots; shot++)
+    {
 
         //-----------------------------------
         // le o traco individual deste shot (com mute)
@@ -568,7 +557,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 }
         file_shot.close();
 
-        /*
         std::fill(u_curr, u_curr + nx_abc * nz_abc, 0.0f);
         std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f);
         std::fill(seismogram_shot, seismogram_shot + nt, 0.0f);
@@ -577,7 +565,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         std::fill(pt_fwd, pt_fwd + nx_abc * nz_abc, 0.0f);
         std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
         std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
-        */
+
         for (int n = 1; n < nt; n++)
         { // each iteration calculates the wave at the next instant
 
@@ -733,15 +721,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     u_curr[x * nz_abc + z] *= A[k];
                 }
             }
-
-            //--------------------------------------------------
-            // save the receiver (par 1-1: tiro k -> receiver k)
-            //--------------------------------------------------
-
-            int xr = receivers[shot].x;
-            int zr = receivers[shot].z;
-
-            seismogram_shot[n] = u_next[xr * nz_abc + zr];
 
             //-------------------------------------------------------
             // SAVE ALL THE PVxz + OF (binary document)
@@ -946,7 +925,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             if (n % 10 == 0)
             {
 
-                std::ofstream file_back("/home/processamento/acustica_2D/outputs/snapshot_back_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                //std::ofstream file_back("/home/processamento/acustica_2D/outputs/snapshot_back_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 std::ofstream file_PVxOF_back("/home/processamento/acustica_2D/outputs/PV+OF_back_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
                 std::ofstream file_PVzOF_back("/home/processamento/acustica_2D/outputs/PV+OF_back_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
@@ -954,14 +933,14 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 for (int x = Nboudary; x < nx_abc - Nboudary; x++)
                 {
 
-                    file_back.write(reinterpret_cast<char *>(&u_back_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
+                    //file_back.write(reinterpret_cast<char *>(&u_back_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
 
                     file_PVxOF_back.write(reinterpret_cast<char *>(&ux_back[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
 
                     file_PVzOF_back.write(reinterpret_cast<char *>(&uz_back[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
                 }
 
-                file_back.close();
+                //file_back.close();
                 file_PVxOF_back.close();
                 file_PVzOF_back.close();
             }
@@ -1006,21 +985,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
             {
-                std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-
-                if (!fwd_file.is_open())
-                {
-                    std::cerr << "ERRO: nao abriu snapshot_fwd_" << fwd_index << ".bin" << std::endl;
-                }
-
-                fwd_file.read(reinterpret_cast<char *>(u_fwd_n), nx * nz * sizeof(float));
-
-                if (!fwd_file)
-                {
-                    std::cerr << "ERRO: leitura incompleta em snapshot_fwd_" << fwd_index << ".bin, leu " << fwd_file.gcount() << " bytes" << std::endl;
-                }
-
-                fwd_file.close();
 
                 // --------------------------------------------------------
                 // PV+OF_fwd_x and PV+OF_fwd_z
@@ -1090,7 +1054,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                         float modulo_back = sqrt(ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]);
 
-                        int gather = -1; //guarda o índice do bin de ângulo onde -1 signiifca "não classificado"
+                        int bin_angle = -1; //guarda o índice do bin de ângulo onde -1 signiifca "não classificado"
 
                         if (modulo_fwd > thresh_fwd && modulo_back > thresh_back) //só deixa passar pontos com amplitude genuína o suficiente para confiar na direção estimada
                         {
@@ -1108,13 +1072,13 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                             
                             if (theta[j * nz + i] >= 0.0f && theta[j * nz + i] < 90.0f)
                             {
-                                gather = (int)(theta[j * nz + i] / angle_step);
+                                bin_angle = (int)(theta[j * nz + i] / angle_step);
                             }
                         }
 
-                        if (gather >= 0)
+                        if (bin_angle >= 0)
                         {
-                            image_ADCIGs[gather * nx * nz + j * nz + i] += u_fwd_n[j * nz + i] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
+                            image_ADCIGs[bin_angle * n_gathers * nz + j * nz + i] += u_fwd_n[j * nz + i] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
                         }
                     }
                 }
@@ -1126,7 +1090,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             std::swap(u_back_curr, u_back_next);
         }
-    //}
+    }
 
     //--------------------------------------
     // SAVE the copy of the final field fwd
