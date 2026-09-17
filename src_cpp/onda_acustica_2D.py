@@ -598,7 +598,9 @@ plt.figure(figsize=(6, 8))
 
 vmax = np.percentile(np.abs(image), 99) if np.any(image) else 1.0
 
-plt.imshow(image.T, cmap="gray", aspect="auto", vmin=-vmax, vmax=vmax)
+plt.imshow(image.T, cmap="gray", aspect="auto",
+           extent=[0, nx * dx, nz * dz, 0],
+           vmin=-vmax, vmax=vmax)
 
 plt.xlabel("x (m)")
 
@@ -795,7 +797,6 @@ ax.margins(y=0)
 plt.tight_layout()
 
 plt.show()
-'''
 
 #-----------------------------------------------
 # image of the ADCIGs (Density + Wiggle overlay)
@@ -892,7 +893,7 @@ ax.margins(y=0)
 
 plt.tight_layout()
 plt.show()
-
+'''
 
 #----------------------------------
 # Plot the seismic trace
@@ -922,9 +923,8 @@ plt.show()
 #----------------------------------
 
 dt = 0.000500
-n_pairs = 24
-
 pairs = pd.read_csv("/home/processamento/acustica_2D/inputs/pares_geometry.csv")  
+n_pairs = len(pairs)
 
 traces = []
 for i in range(n_pairs):
@@ -1059,5 +1059,65 @@ plt.xlabel("Offset (m)")
 plt.ylabel("Tempo (s)")
 plt.title("Sismograma completo (CMP) com MUTE")
 plt.colorbar(label="Amplitude")
+plt.tight_layout()
+plt.show()
+
+#-----------------------------------------------
+# image of the ADCIG (Density + Wiggle overlay) - UM UNICO GATHER, arquivo unico
+#-----------------------------------------------
+
+outdir = "/home/processamento/acustica_2D/outputs"
+angle_step = 5
+n_angle_bins = 18  # ajuste conforme o binning real usado no C++
+
+#-----------------------------------------------
+# le o arquivo unico (ja combina todos os shots empilhados)
+#-----------------------------------------------
+
+panel_data_flat = np.fromfile(f"{outdir}/image_migrated_ADCIG.bin", dtype=np.float32)
+
+n_floats = panel_data_flat.size
+expected = n_angle_bins * nz
+
+if n_floats != expected:
+    raise ValueError(f"Tamanho lido ({n_floats}) nao bate com n_angle_bins*nz ({expected}). "
+                      f"Confira n_angle_bins ou nz.")
+
+panel_data = panel_data_flat.reshape(n_angle_bins, nz).T  # (nz, n_angle_bins), mesmo formato usado no plot
+
+#-----------------------------------------------
+# Density plot (fundo) + Wiggle overlay (contorno dos eventos)
+#-----------------------------------------------
+
+def plot_wiggle_overlay(ax, trace, z_axis, x_offset, norm_value, color="black", lw=0.5):
+    """Sobrepoe apenas o contorno (linha), sem preencher, por cima do density plot."""
+    if norm_value < 1e-12:
+        return
+    amp = (trace / norm_value) * 0.9 + x_offset
+    ax.plot(amp, z_axis, color=color, linewidth=lw)
+
+z_axis = np.arange(nz) * dz
+trace_spacing = 1.0
+
+panel_max = np.percentile(np.abs(panel_data), 99.0)
+
+fig, ax = plt.subplots(figsize=(6, 8))
+
+if panel_max > 1e-12:
+
+    # ---- fundo: density plot suavizado ----
+    ax.imshow(panel_data, cmap="gray", vmin=-panel_max, vmax=panel_max,
+              extent=[0, n_angle_bins * angle_step, z_axis[-1], z_axis[0]],
+              aspect="auto", origin="upper", interpolation="bilinear")
+
+else:
+    print("Aviso: painel sem energia (todos os valores proximos de zero).")
+
+ax.set_ylabel("z (m)")
+ax.set_xlabel("Ângulo de abertura (graus)")
+ax.set_xticks(np.arange(0, 91, 10))
+ax.set_title("ADCIG - CMP empilhado", fontsize=14, fontweight="bold")
+ax.set_xlim(0, n_angle_bins * angle_step)
+
 plt.tight_layout()
 plt.show()

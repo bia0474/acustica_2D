@@ -7,6 +7,34 @@
 #include <stdlib.h>
 #include <omp.h>
 
+//----------------------------------
+// CFL condition
+//----------------------------------
+
+bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //function of the stability codition
+
+    float cmax = 0.0f;
+
+
+    for(int i = 0; i < nx; i++){
+
+        for(int j = 0; j < nz; j++){
+
+            cmax = std::max(cmax, c[i * nz + j]);
+        }
+    }
+
+    float courant = cmax * dt / dx;
+
+    if(courant > 0.7f){
+
+        std::cout << "ERROR! NOT STABLE" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 //-------------------------------
 // Struct of the receivers
 //-------------------------------
@@ -506,6 +534,13 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     // Nshots pares, cada um com nt amostras
 
     // Nsource == Nrec (mesmo número de pares fonte-receptor)
+    if (Nsource != nrec)
+    {
+        std::cerr << "ERRO: a geometria CMP exige Nsource == nrec ("
+                  << Nsource << " != " << nrec << ")\n";
+        return nullptr;
+    }
+
     int Nshots = Nsource;
 
     float *seismogram_shot = (float*) malloc(nt * sizeof(float));
@@ -516,7 +551,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     const float angle_step = 5.0f;
     const int max_angle = 90;
-    const int n_angles = max_angle / angle_step + 1; //+1 to include 0 degrees
+    const int n_angles = max_angle / angle_step;
     const int n_gathers = 1;
 
     float *image = (float *)calloc(nx * nz, sizeof(float));
@@ -535,12 +570,29 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     for (int shot = 0; shot < Nshots; shot++)
     {
+        std::fill(u_curr, u_curr + nx_abc * nz_abc, 0.0f);
+        std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f);
+        std::fill(seismogram_shot, seismogram_shot + nt, 0.0f);
+        std::fill(px_fwd, px_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(pz_fwd, pz_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(pt_fwd, pt_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(u_back_curr, u_back_curr + nx_abc * nz_abc, 0.0f);
+        std::fill(u_back_next, u_back_next + nx_abc * nz_abc, 0.0f);
+        std::fill(px_back, px_back + nx_abc * nz_abc, 0.0f);
+        std::fill(pz_back, pz_back + nx_abc * nz_abc, 0.0f);
+        std::fill(pt_back, pt_back + nx_abc * nz_abc, 0.0f);
+        std::fill(ux_back, ux_back + nx_abc * nz_abc, 0.0f);
+        std::fill(uz_back, uz_back + nx_abc * nz_abc, 0.0f);
+
+        int cmp_x = ((sx[shot] - Nboudary) + (receivers[shot].x - Nboudary)) / 2;
 
         //-----------------------------------
-        // le o traco individual deste shot (com mute)
+        // Le o traco mutado para reduzir a contaminacao da onda direta.
         //-----------------------------------
 
-        std::string filename = "/home/processamento/acustica_2D/outputs/seismogram_shot" + std::to_string(shot) + ".bin";
+        std::string filename = "/home/processamento/acustica_2D/outputs/seismogram_shot" + std::to_string(shot) + "_mute.bin";
 
         std::ifstream file_shot(filename, std::ios::binary);
 
@@ -552,19 +604,12 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         file_shot.read(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
 
         if(!file_shot){
-        std::cout << "ERRO: leitura incompleta em " << filename << ", leu " << file_shot.gcount() << " bytes (esperado " << nt * sizeof(float) << ")\n";
-        exit(1);
-}
+            std::cout << "ERRO: leitura incompleta em " << filename << ", leu " << file_shot.gcount() << " bytes (esperado " << nt * sizeof(float) << ")\n";
+            exit(1);
+        }
+
         file_shot.close();
 
-        std::fill(u_curr, u_curr + nx_abc * nz_abc, 0.0f);
-        std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f);
-        std::fill(seismogram_shot, seismogram_shot + nt, 0.0f);
-        std::fill(px_fwd, px_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(pz_fwd, pz_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(pt_fwd, pt_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
 
         for (int n = 1; n < nt; n++)
         { // each iteration calculates the wave at the next instant
@@ -852,7 +897,9 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             int xr = receivers[shot].x;
             int zr = receivers[shot].z;
 
-            u_back_next[xr * nz_abc + zr] += seismogram_shot[n] / (dx * dz);
+            int time_index = nt - 1 - n;
+
+            u_back_next[xr * nz_abc + zr] += seismogram_shot[time_index] / (dx * dz);
 
             //-----------------------------------
             // CERJAN
@@ -1076,9 +1123,9 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                             }
                         }
 
-                        if (bin_angle >= 0)
+                        if (bin_angle >= 0 && j == cmp_x)
                         {
-                            image_ADCIGs[bin_angle * n_gathers * nz + j * nz + i] += u_fwd_n[j * nz + i] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
+                            image_ADCIGs[bin_angle * n_gathers * nz + i] += u_fwd_n[j * nz + i] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
                         }
                     }
                 }
@@ -1110,6 +1157,11 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     std::cout << "Saving the migrated image!" << std::endl;
 
+    for (int i = 0; i < nx * nz; i++)
+    {
+        image[i] /= static_cast<float>(Nshots);
+    }
+
     std::ofstream img_file("/home/processamento/acustica_2D/outputs/image.bin", std::ios::binary);
 
     img_file.write(reinterpret_cast<char *>(image), nx * nz * sizeof(float));
@@ -1118,32 +1170,31 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     std::cout << "Migrated image binary file saved!" << std::endl;
 
-    //----------------------------------------------------
-    // salvar as 18 imagens em disco
-    //----------------------------------------------------
+    //------------------------
+    // salva o image_ADCIGs 
+    //-----------------------
 
-    for (int bin = 0; bin < n_gathers; bin++)
+    //1 gather do CMP
+    std::string filename = "/home/processamento/acustica_2D/outputs/image_migrated_ADCIG.bin";
+
+    std::ofstream out_file(filename, std::ios::binary);
+
+    if (!out_file.is_open())
     {
-        float lo = bin * angle_step;
-        float hi = lo + angle_step;
-
-        //salva a imagem migrada inteira (todo x, todo z), limitada a um intervalo de ângulo - não é um "ADICIG"
-        std::string filename = "/home/processamento/acustica_2D/outputs/ADCIG_" + std::to_string((int)lo) + "_" + std::to_string((int)hi) + ".bin";
-
-        std::ofstream out_file(filename, std::ios::binary);
-
-        if (!out_file.is_open())
-        {
-            std::cerr << "ERRO: nao conseguiu salvar " << filename << std::endl;
-            continue;
-        }
-
-        out_file.write(reinterpret_cast<char *>(&image_ADCIGs[bin * nx * nz]), nx * nz * sizeof(float));
-
-        out_file.close();
-
-        std::cout << "Salvo: " << filename << std::endl;
+        std::cerr << "ERRO: nao conseguiu salvar " << filename << std::endl;
+        return nullptr;
     }
+
+    for (int i = 0; i < n_angles * n_gathers * nz; i++)
+    {
+        image_ADCIGs[i] /= static_cast<float>(Nshots);
+    }
+
+    out_file.write(reinterpret_cast<char *>(image_ADCIGs), n_angles * n_gathers * nz * sizeof(float));
+
+    out_file.close();
+
+    std::cout << "Salvo: " << filename << std::endl;
 
     free(u_curr);
     free(u_next);
@@ -1156,7 +1207,11 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     free(u_back_curr);
     free(u_back_next);
     free(image);
+    free(image_ADCIGs);
     free(u_fwd_n);
+    free(ux_fwd_n);
+    free(uz_fwd_n);
+    free(theta);
 
     return result;
 }
@@ -1235,6 +1290,19 @@ int main()
     if (!checkGeometry(sx, sz, Nsource, receivers, nrec, nx, nz, Nboudary))
     {
         return 1;
+    }
+
+    //----------------------------------
+    // CFL check
+    //----------------------------------
+
+    if(CFL(c, dt, dx, dz, nx_abc, nz_abc)){
+
+        std::cout << "Stable simulation" << std::endl;
+    }
+    else{
+
+        std::cout << "unstable simulation" << std::endl;
     }
 
     //-----------------------------------------
