@@ -533,6 +533,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     for (int shot = 0; shot < Nshots; shot++)
     {
+        std::cout << "Tiro " << shot << "\n";
+
         std::fill(u_curr, u_curr + nx_abc * nz_abc, 0.0f);
         std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f);
         std::fill(seismogram_shot, seismogram_shot + nt, 0.0f);

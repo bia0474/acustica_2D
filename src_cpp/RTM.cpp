@@ -536,8 +536,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     // Nsource == Nrec (mesmo número de pares fonte-receptor)
     if (Nsource != nrec)
     {
-        std::cerr << "ERRO: a geometria CMP exige Nsource == nrec ("
-                  << Nsource << " != " << nrec << ")\n";
+        std::cerr << "ERRO: a geometria CMP exige Nsource == nrec (" << Nsource << " != " << nrec << ")\n";
         return nullptr;
     }
 
@@ -570,6 +569,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     for (int shot = 0; shot < Nshots; shot++)
     {
+        std::cout << "Tiro " << shot << "\n";
+
         std::fill(u_curr, u_curr + nx_abc * nz_abc, 0.0f);
         std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f);
         std::fill(seismogram_shot, seismogram_shot + nt, 0.0f);
@@ -577,7 +578,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         std::fill(pz_fwd, pz_fwd + nx_abc * nz_abc, 0.0f);
         std::fill(pt_fwd, pt_fwd + nx_abc * nz_abc, 0.0f);
         std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
-        std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
+        std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);  
         std::fill(u_back_curr, u_back_curr + nx_abc * nz_abc, 0.0f);
         std::fill(u_back_next, u_back_next + nx_abc * nz_abc, 0.0f);
         std::fill(px_back, px_back + nx_abc * nz_abc, 0.0f);
@@ -972,7 +973,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             if (n % 10 == 0)
             {
 
-                //std::ofstream file_back("/home/processamento/acustica_2D/outputs/snapshot_back_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ofstream file_back("/home/processamento/acustica_2D/outputs/snapshot_back_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 std::ofstream file_PVxOF_back("/home/processamento/acustica_2D/outputs/PV+OF_back_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
                 std::ofstream file_PVzOF_back("/home/processamento/acustica_2D/outputs/PV+OF_back_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
@@ -980,14 +981,14 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 for (int x = Nboudary; x < nx_abc - Nboudary; x++)
                 {
 
-                    //file_back.write(reinterpret_cast<char *>(&u_back_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
+                    file_back.write(reinterpret_cast<char *>(&u_back_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
 
                     file_PVxOF_back.write(reinterpret_cast<char *>(&ux_back[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
 
                     file_PVzOF_back.write(reinterpret_cast<char *>(&uz_back[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
                 }
 
-                //file_back.close();
+                file_back.close();
                 file_PVxOF_back.close();
                 file_PVzOF_back.close();
             }

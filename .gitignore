@@ -3,3 +3,5 @@ runAcustica2D
 rtm
 geometry
 model
+.vscode
+_pycache_
