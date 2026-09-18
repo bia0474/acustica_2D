@@ -555,6 +555,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     float *image = (float *)calloc(nx * nz, sizeof(float));
     float *image_ADCIGs = (float *)calloc(n_angles * n_gathers * nz, sizeof(float));
+    int *adcig_fold = (int *)calloc(n_angles * n_gathers * nz, sizeof(int));
     float *u_fwd_n = (float *)calloc(nx * nz, sizeof(float));
     float *ux_fwd_n = (float *)calloc(nx * nz, sizeof(float));
     float *uz_fwd_n = (float *)calloc(nx * nz, sizeof(float));
@@ -590,7 +591,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         int cmp_x = ((sx[shot] - Nboudary) + (receivers[shot].x - Nboudary)) / 2;
 
         //-----------------------------------
-        // Le o traco mutado para reduzir a contaminacao da onda direta.
+        // Le o traco mutado 
         //-----------------------------------
 
         std::string filename = "/home/processamento/acustica_2D/outputs/seismogram_shot" + std::to_string(shot) + "_mute.bin";
@@ -660,49 +661,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
-            //---------------------------------------------------------------
-            // Using Optical Flow method (20 iterations over the entire mesh)
-            //---------------------------------------------------------------
-
-            if (n % 10 == 0)
-            {
-
-                std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
-                std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
-
-                int n_iter = 20;
-                float alpha = 1.0f;
-
-                for (int iter = 0; iter < n_iter; iter++)
-                {
-                    for (int j = 2; j < nx_abc - 2; j++)
-                    {
-                        for (int i = 2; i < nz_abc - 2; i++)
-                        {
-                            float somaux_fwd = 0.0f;
-                            float somauz_fwd = 0.0f;
-
-                            for (int a = -1; a <= 1; a++)
-                            {
-                                for (int b = -1; b <= 1; b++)
-                                {
-                                    somaux_fwd += ux_fwd[(j + a) * nz_abc + (i + b)];
-                                    somauz_fwd += uz_fwd[(j + a) * nz_abc + (i + b)];
-                                }
-                            }
-
-                            float ux_fwd_average = (1.0f / 12.0f) * (ux_fwd[j * nz_abc + i - nz_abc] + ux_fwd[j * nz_abc + i + nz_abc] + ux_fwd[j * nz_abc + i - 1] + ux_fwd[j * nz_abc + i + 1] - ux_fwd[j * nz_abc + i] + somaux_fwd);
-                            float uz_fwd_average = (1.0f / 12.0f) * (uz_fwd[j * nz_abc + i - nz_abc] + uz_fwd[j * nz_abc + i + nz_abc] + uz_fwd[j * nz_abc + i - 1] + uz_fwd[j * nz_abc + i + 1] - uz_fwd[j * nz_abc + i] + somauz_fwd);
-
-                            float denominator_fwd = alpha * alpha + px_fwd[j * nz_abc + i] * px_fwd[j * nz_abc + i] + pz_fwd[j * nz_abc + i] * pz_fwd[j * nz_abc + i];
-
-                            ux_fwd[j * nz_abc + i] = ux_fwd_average - (px_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
-                            uz_fwd[j * nz_abc + i] = uz_fwd_average - (pz_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
-                        }
-                    }
-                }
-            }
-
             //----------------------------------
             // source injection (uma fonte só)
             //----------------------------------
@@ -765,6 +723,49 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                     u_next[x * nz_abc + z] *= A[k];
                     u_curr[x * nz_abc + z] *= A[k];
+                }
+            }
+
+            //---------------------------------------------------------------
+            // Using Optical Flow method (20 iterations over the entire mesh)
+            //---------------------------------------------------------------
+
+            if (n % 10 == 0)
+            {
+
+                std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
+                std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
+
+                int n_iter = 20;
+                float alpha = 1.0f;
+
+                for (int iter = 0; iter < n_iter; iter++)
+                {
+                    for (int j = 2; j < nx_abc - 2; j++)
+                    {
+                        for (int i = 2; i < nz_abc - 2; i++)
+                        {
+                            float somaux_fwd = 0.0f;
+                            float somauz_fwd = 0.0f;
+
+                            for (int a = -1; a <= 1; a++)
+                            {
+                                for (int b = -1; b <= 1; b++)
+                                {
+                                    somaux_fwd += ux_fwd[(j + a) * nz_abc + (i + b)];
+                                    somauz_fwd += uz_fwd[(j + a) * nz_abc + (i + b)];
+                                }
+                            }
+
+                            float ux_fwd_average = (1.0f / 12.0f) * (ux_fwd[j * nz_abc + i - nz_abc] + ux_fwd[j * nz_abc + i + nz_abc] + ux_fwd[j * nz_abc + i - 1] + ux_fwd[j * nz_abc + i + 1] - ux_fwd[j * nz_abc + i] + somaux_fwd);
+                            float uz_fwd_average = (1.0f / 12.0f) * (uz_fwd[j * nz_abc + i - nz_abc] + uz_fwd[j * nz_abc + i + nz_abc] + uz_fwd[j * nz_abc + i - 1] + uz_fwd[j * nz_abc + i + 1] - uz_fwd[j * nz_abc + i] + somauz_fwd);
+
+                            float denominator_fwd = alpha * alpha + px_fwd[j * nz_abc + i] * px_fwd[j * nz_abc + i] + pz_fwd[j * nz_abc + i] * pz_fwd[j * nz_abc + i];
+
+                            ux_fwd[j * nz_abc + i] = ux_fwd_average - (px_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
+                            uz_fwd[j * nz_abc + i] = uz_fwd_average - (pz_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
+                        }
+                    }
                 }
             }
 
@@ -847,49 +848,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
-            //---------------------------------------------------------------
-            // Using Optical Flow method (20 iterations over the entire mesh)
-            //---------------------------------------------------------------
-
-            if (n % 10 == 0)
-            {
-
-                std::fill(ux_back, ux_back + nx_abc * nz_abc, 0.0f);
-                std::fill(uz_back, uz_back + nx_abc * nz_abc, 0.0f);
-
-                int n_iter = 20;
-                float alpha = 1.0f;
-
-                for (int iter = 0; iter < n_iter; iter++)
-                {
-                    for (int j = 2; j < nx_abc - 2; j++)
-                    {
-                        for (int i = 2; i < nz_abc - 2; i++)
-                        {
-                            float somaux_back = 0.0f;
-                            float somauz_back = 0.0f;
-
-                            for (int a = -1; a <= 1; a++)
-                            {
-                                for (int b = -1; b <= 1; b++)
-                                {
-                                    somaux_back += ux_back[(j + a) * nz_abc + (i + b)];
-                                    somauz_back += uz_back[(j + a) * nz_abc + (i + b)];
-                                }
-                            }
-
-                            float ux_back_average = (1.0f / 12.0f) * (ux_back[j * nz_abc + i - nz_abc] + ux_back[j * nz_abc + i + nz_abc] + ux_back[j * nz_abc + i - 1] + ux_back[j * nz_abc + i + 1] - ux_back[j * nz_abc + i] + somaux_back);
-                            float uz_back_average = (1.0f / 12.0f) * (uz_back[j * nz_abc + i - nz_abc] + uz_back[j * nz_abc + i + nz_abc] + uz_back[j * nz_abc + i - 1] + uz_back[j * nz_abc + i + 1] - uz_back[j * nz_abc + i] + somauz_back);
-
-                            float denominator_back = alpha * alpha + px_back[j * nz_abc + i] * px_back[j * nz_abc + i] + pz_back[j * nz_abc + i] * pz_back[j * nz_abc + i];
-
-                            ux_back[j * nz_abc + i] = ux_back_average - (px_back[j * nz_abc + i] * (px_back[j * nz_abc + i] * ux_back_average + pz_back[j * nz_abc + i] * uz_back_average + pt_back[j * nz_abc + i]) / denominator_back);
-                            uz_back[j * nz_abc + i] = uz_back_average - (pz_back[j * nz_abc + i] * (px_back[j * nz_abc + i] * ux_back_average + pz_back[j * nz_abc + i] * uz_back_average + pt_back[j * nz_abc + i]) / denominator_back);
-                        }
-                    }
-                }
-            }
-
             //----------------------------------
             // injection energy to the grid
             //----------------------------------
@@ -958,6 +916,49 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                     u_back_next[x * nz_abc + z] *= A[k];
                     u_back_curr[x * nz_abc + z] *= A[k];
+                }
+            }
+
+            //---------------------------------------------------------------
+            // Using Optical Flow method (20 iterations over the entire mesh)
+            //---------------------------------------------------------------
+
+            if (n % 10 == 0)
+            {
+
+                std::fill(ux_back, ux_back + nx_abc * nz_abc, 0.0f);
+                std::fill(uz_back, uz_back + nx_abc * nz_abc, 0.0f);
+
+                int n_iter = 20;
+                float alpha = 1.0f;
+
+                for (int iter = 0; iter < n_iter; iter++)
+                {
+                    for (int j = 2; j < nx_abc - 2; j++)
+                    {
+                        for (int i = 2; i < nz_abc - 2; i++)
+                        {
+                            float somaux_back = 0.0f;
+                            float somauz_back = 0.0f;
+
+                            for (int a = -1; a <= 1; a++)
+                            {
+                                for (int b = -1; b <= 1; b++)
+                                {
+                                    somaux_back += ux_back[(j + a) * nz_abc + (i + b)];
+                                    somauz_back += uz_back[(j + a) * nz_abc + (i + b)];
+                                }
+                            }
+
+                            float ux_back_average = (1.0f / 12.0f) * (ux_back[j * nz_abc + i - nz_abc] + ux_back[j * nz_abc + i + nz_abc] + ux_back[j * nz_abc + i - 1] + ux_back[j * nz_abc + i + 1] - ux_back[j * nz_abc + i] + somaux_back);
+                            float uz_back_average = (1.0f / 12.0f) * (uz_back[j * nz_abc + i - nz_abc] + uz_back[j * nz_abc + i + nz_abc] + uz_back[j * nz_abc + i - 1] + uz_back[j * nz_abc + i + 1] - uz_back[j * nz_abc + i] + somauz_back);
+
+                            float denominator_back = alpha * alpha + px_back[j * nz_abc + i] * px_back[j * nz_abc + i] + pz_back[j * nz_abc + i] * pz_back[j * nz_abc + i];
+
+                            ux_back[j * nz_abc + i] = ux_back_average - (px_back[j * nz_abc + i] * (px_back[j * nz_abc + i] * ux_back_average + pz_back[j * nz_abc + i] * uz_back_average + pt_back[j * nz_abc + i]) / denominator_back);
+                            uz_back[j * nz_abc + i] = uz_back_average - (pz_back[j * nz_abc + i] * (px_back[j * nz_abc + i] * ux_back_average + pz_back[j * nz_abc + i] * uz_back_average + pt_back[j * nz_abc + i]) / denominator_back);
+                        }
+                    }
                 }
             }
 
@@ -1103,6 +1104,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                         float modulo_back = sqrt(ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]);
 
                         int bin_angle = -1; //guarda o índice do bin de ângulo onde -1 signiifca "não classificado"
+                        
+                        const int min_imaging_z = 10;
 
                         if (modulo_fwd > thresh_fwd && modulo_back > thresh_back) //só deixa passar pontos com amplitude genuína o suficiente para confiar na direção estimada
                         {
@@ -1124,9 +1127,11 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                             }
                         }
 
-                        if (bin_angle >= 0 && j == cmp_x)
+                        if (bin_angle >= 0 && std::abs(j - cmp_x) <= 2 && i >= min_imaging_z)
                         {
                             image_ADCIGs[bin_angle * n_gathers * nz + i] += u_fwd_n[j * nz + i] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
+
+                            adcig_fold[bin_angle * n_gathers * nz + i]++;
                         }
                     }
                 }
@@ -1188,7 +1193,10 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     for (int i = 0; i < n_angles * n_gathers * nz; i++)
     {
-        image_ADCIGs[i] /= static_cast<float>(Nshots);
+        if (adcig_fold[i] > 0)
+        {
+            image_ADCIGs[i] /= static_cast<float>(adcig_fold[i]);
+        }
     }
 
     out_file.write(reinterpret_cast<char *>(image_ADCIGs), n_angles * n_gathers * nz * sizeof(float));
@@ -1213,6 +1221,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     free(ux_fwd_n);
     free(uz_fwd_n);
     free(theta);
+    free(adcig_fold);
 
     return result;
 }

@@ -989,6 +989,12 @@ pairs = pd.read_csv("/home/processamento/acustica_2D/inputs/pares_geometry.csv")
 
 fname_cmp = "/home/processamento/acustica_2D/outputs/cmp_gather.bin"
 
+if not os.path.exists(fname_cmp) or os.path.getsize(fname_cmp) == 0:
+    raise RuntimeError(
+        f"O gather CMP esta vazio: {fname_cmp}. "
+        "Rode novamente a modelagem direta para gerar cmp_gather.bin."
+    )
+
 n_floats = os.path.getsize(fname_cmp) // 4  # 4 bytes por float32
 
 if n_floats % nt != 0:
@@ -1030,6 +1036,12 @@ nt = nt_real  # reaproveita o nt confirmado no traco individual acima
 pairs = pd.read_csv("/home/processamento/acustica_2D/inputs/pares_geometry.csv")  
 
 fname_cmp = "/home/processamento/acustica_2D/outputs/cmp_gather_mute.bin"
+
+if not os.path.exists(fname_cmp) or os.path.getsize(fname_cmp) == 0:
+    raise RuntimeError(
+        f"O gather CMP com mute esta vazio: {fname_cmp}. "
+        "Rode novamente a modelagem direta para gerar cmp_gather_mute.bin."
+    )
 
 n_floats = os.path.getsize(fname_cmp) // 4  # 4 bytes por float32
 
@@ -1080,8 +1092,7 @@ n_floats = panel_data_flat.size
 expected = n_angle_bins * nz
 
 if n_floats != expected:
-    raise ValueError(f"Tamanho lido ({n_floats}) nao bate com n_angle_bins*nz ({expected}). "
-                      f"Confira n_angle_bins ou nz.")
+    raise ValueError(f"Tamanho lido ({n_floats}) nao bate com n_angle_bins*nz ({expected}). "f"Confira n_angle_bins ou nz.")
 
 panel_data = panel_data_flat.reshape(n_angle_bins, nz).T  # (nz, n_angle_bins), mesmo formato usado no plot
 
@@ -1106,9 +1117,7 @@ fig, ax = plt.subplots(figsize=(6, 8))
 if panel_max > 1e-12:
 
     # ---- fundo: density plot suavizado ----
-    ax.imshow(panel_data, cmap="gray", vmin=-panel_max, vmax=panel_max,
-              extent=[0, n_angle_bins * angle_step, z_axis[-1], z_axis[0]],
-              aspect="auto", origin="upper", interpolation="bilinear")
+    ax.imshow(panel_data, cmap="gray", vmin=-panel_max, vmax=panel_max, extent=[0, n_angle_bins * angle_step, z_axis[-1], z_axis[0]], aspect="auto", origin="upper", interpolation="bilinear")
 
 else:
     print("Aviso: painel sem energia (todos os valores proximos de zero).")
