@@ -8,34 +8,6 @@
 #include <omp.h>
 #include <time.h>
 
-//----------------------------------
-// CFL condition
-//----------------------------------
-
-bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //function of the stability codition
-
-    float cmax = 0.0f;
-
-
-    for(int i = 0; i < nx; i++){
-
-        for(int j = 0; j < nz; j++){
-
-            cmax = std::max(cmax, c[i * nz + j]);
-        }
-    }
-
-    float courant = cmax * dt / dx;
-
-    if(courant > 0.7f){
-
-        std::cout << "ERROR! NOT STABLE" << std::endl;
-        return false;
-    }
-
-    return true;
-}
-
 //-------------------------------
 // Struct of the receivers
 //-------------------------------
@@ -259,13 +231,21 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
 
     if (file == NULL)
     {
-        printf("Erro ao abrir o arquivo do modelo de velocidade.\n");
+        printf("Erro ao abrir o arquivo do modelo de velocidade: %s\n", velocity_file);
         exit(1);
     }
     
     float *c = (float *)malloc(nx * nz * sizeof(float));
 
-    fread(c, sizeof(float), nx * nz, file);
+    size_t values_read = fread(c, sizeof(float), nx * nz, file);
+
+    if (values_read != static_cast<size_t>(nx * nz))
+    {
+        printf("Erro ao ler o modelo de velocidade: %s (%zu de %d valores)\n", velocity_file, values_read, nx * nz);
+        free(c);
+        fclose(file);
+        exit(1);
+    }
 
     fclose(file);
 
@@ -416,6 +396,34 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
 }     
 
 //----------------------------------
+// CFL condition
+//----------------------------------
+
+bool CFL(const float* c, float dt, float dx, int nx, int nz){ //function of the stability codition
+
+    float cmax = 0.0f;
+
+
+    for(int i = 0; i < nx; i++){
+
+        for(int j = 0; j < nz; j++){
+
+            cmax = std::max(cmax, c[i * nz + j]);
+        }
+    }
+
+    float courant = cmax * dt / dx;
+
+    if(courant > 0.7f){
+
+        std::cout << "ERROR! NOT STABLE" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+//----------------------------------
 // check geometry function
 //----------------------------------
 
@@ -528,8 +536,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     // abre os arquivos do CMP UMA VEZ
     //-----------------------------------
 
-    std::ofstream file_cmp("/home/processamento/acustica_2D/outputs/cmp_gather.bin", std::ios::binary);
-    std::ofstream file_cmp_mute("/home/processamento/acustica_2D/outputs/cmp_gather_mute.bin", std::ios::binary);
+    std::ofstream file_cmp("../outputs/cmp_gather.bin", std::ios::binary);
+    std::ofstream file_cmp_mute("../outputs/cmp_gather_mute.bin", std::ios::binary);
 
     for (int shot = 0; shot < Nshots; shot++)
     {
@@ -652,7 +660,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             if (n % 10 == 0)
             {
 
-                std::ofstream file_fwd("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ofstream file_fwd("../outputs/snapshot_fwd_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 for (int x = Nboudary; x < nx_abc - Nboudary; x++)
                 {
@@ -676,7 +684,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         // salva o sismograma deste tiro em um arquivo separado
         //-----------------------------------------------------
 
-        std::string filename = "/home/processamento/acustica_2D/outputs/seismogram_shot" + std::to_string(shot) + ".bin";
+        std::string filename = "../outputs/seismogram_shot" + std::to_string(shot) + ".bin";
 
         std::ofstream file(filename, std::ios::binary);
             
@@ -701,7 +709,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         //-----------------------------------
 
         float v_direct = 1500.0f;
-        float pre_direct = 0.05f;
+        float shift = 0.50f;
         float window   = 0.10f;
 
         float dz_rec = (receivers[shot].z - sz[shot]) * dz;
@@ -709,10 +717,10 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         float dist = std::sqrt(dz_rec * dz_rec + dx_rec * dx_rec);
 
-        float traveltime = dist / v_direct;
+        float traveltime = (dist / v_direct) + shift;
 
-        float t1 = std::max(0.0f, traveltime - pre_direct);
-        float t2 = traveltime + window;
+        float t1 = traveltime;
+        float t2 = t1 + window;
 
         for (int it = 0; it < nt; it++)
         {
@@ -732,7 +740,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         // salva o sismograma deste tiro COM MUTE, em arquivo separado
         //------------------------------------------------------------------
 
-        std::string filename_mute = "/home/processamento/acustica_2D/outputs/seismogram_shot" + std::to_string(shot) + "_mute.bin";
+        std::string filename_mute = "../outputs/seismogram_shot" + std::to_string(shot) + "_mute.bin";
 
         std::ofstream file_mute(filename_mute, std::ios::binary);
 
@@ -821,7 +829,7 @@ int main()
 
     std::cout << "Reading the document of the parameters!" << std::endl;
 
-    readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx, &nz, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
+    readParameters("../inputs/parameters.txt", &T, &nx, &nz, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
 
     //----------------------------------
     // open the document of RECEIVERS
@@ -837,7 +845,7 @@ int main()
 
     std::cout << "Reading the document of the velocity model!" << std::endl;
 
-    float *c = readVelocity("/home/processamento/acustica_2D/inputs/velocityModel.bin", nx, nz, nx_abc, nz_abc, Nboudary);
+    float *c = readVelocity(velocity_file, nx, nz, nx_abc, nz_abc, Nboudary);
 
     //------------------------------------------
     // open the document of the SOURCE
@@ -865,7 +873,7 @@ int main()
     // CFL check
     //----------------------------------
 
-    if(CFL(c, dt, dx, dz, nx, nz)){
+    if(CFL(c, dt, dx, nx, nz)){
 
         std::cout << "Stable simulation" << std::endl;
     }
@@ -902,7 +910,7 @@ int main()
     // Save binary document of the simulation
     //---------------------------------------
 
-    std::ofstream file("/home/processamento/acustica_2D/outputs/wave.bin", std::ios::binary);
+    std::ofstream file("../outputs/wave.bin", std::ios::binary);
 
     file.write(reinterpret_cast<char *>(wavefield), nx_abc * nz_abc * sizeof(float));
 

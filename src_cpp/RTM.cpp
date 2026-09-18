@@ -7,34 +7,6 @@
 #include <stdlib.h>
 #include <omp.h>
 
-//----------------------------------
-// CFL condition
-//----------------------------------
-
-bool CFL(const float* c, float dt, float dx, float dz, int nx, int nz){ //function of the stability codition
-
-    float cmax = 0.0f;
-
-
-    for(int i = 0; i < nx; i++){
-
-        for(int j = 0; j < nz; j++){
-
-            cmax = std::max(cmax, c[i * nz + j]);
-        }
-    }
-
-    float courant = cmax * dt / dx;
-
-    if(courant > 0.7f){
-
-        std::cout << "ERROR! NOT STABLE" << std::endl;
-        return false;
-    }
-
-    return true;
-}
-
 //-------------------------------
 // Struct of the receivers
 //-------------------------------
@@ -84,10 +56,6 @@ void readParameters(const char *filename, int *T, int *nx, int *nz, int *nx_abc,
 
     while (fgets(linha, sizeof(linha), file_parameters))
     {
-
-        if (sscanf(linha, "T = %d", T) == 1)
-            continue;
-
         if (sscanf(linha, "nx = %d", nx) == 1)
             continue;
 
@@ -258,7 +226,7 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
 
     if (file == NULL)
     {
-        printf("Erro ao abrir o arquivo do modelo de velocidade.\n");
+        printf("Erro ao abrir o arquivo do modelo de velocidade: %s\n", velocity_file);
         exit(1);
     }
 
@@ -412,6 +380,34 @@ float *readVelocity(const char *velocity_file, int nx, int nz, int nx_abc, int n
     free(c);
 
     return c_exp;
+}
+
+//----------------------------------
+// CFL condition
+//----------------------------------
+
+bool CFL(const float* c, float dt, float dx, int nx, int nz){ //function of the stability codition
+
+    float cmax = 0.0f;
+
+
+    for(int i = 0; i < nx; i++){
+
+        for(int j = 0; j < nz; j++){
+
+            cmax = std::max(cmax, c[i * nz + j]);
+        }
+    }
+
+    float courant = cmax * dt / dx;
+
+    if(courant > 0.7f){
+
+        std::cout << "ERROR! NOT STABLE" << std::endl;
+        return false;
+    }
+
+    return true;
 }
 
 //----------------------------------
@@ -591,10 +587,10 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         int cmp_x = ((sx[shot] - Nboudary) + (receivers[shot].x - Nboudary)) / 2;
 
         //-----------------------------------
-        // Le o traco mutado 
+        // trace with mute 
         //-----------------------------------
 
-        std::string filename = "/home/processamento/acustica_2D/outputs/seismogram_shot" + std::to_string(shot) + "_mute.bin";
+        std::string filename = "../outputs/seismogram_shot" + std::to_string(shot) + "_mute.bin";
 
         std::ifstream file_shot(filename, std::ios::binary);
 
@@ -662,7 +658,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             }
 
             //----------------------------------
-            // source injection (uma fonte só)
+            // source injection (just one source)
             //----------------------------------
 
             u_next[sx[shot] * nz_abc + sz[shot]] += (fonte[n]) / (dx * dz);
@@ -688,6 +684,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
+    #pragma omp parallel for
             for (int x = nx_abc - Nboudary; x < nx_abc; x++)
             { // right
 
@@ -713,6 +710,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
+    #pragma omp parallel for
             for (int z = nz_abc - Nboudary; z < nz_abc; z++)
             {
 
@@ -781,8 +779,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             if (n % 10 == 0)
             {
 
-                std::ofstream file_PVxOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-                std::ofstream file_PVzOF_fwd("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ofstream file_PVxOF_fwd("../outputs/PV+OF_fwd_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ofstream file_PVzOF_fwd("../outputs/PV+OF_fwd_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 for (int x = Nboudary; x < nx_abc - Nboudary; x++)
                 {
@@ -881,6 +879,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
+    #pragma omp parallel for
             for (int x = nx_abc - Nboudary; x < nx_abc; x++)
             { // right
 
@@ -906,6 +905,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
+    #pragma omp parallel for
             for (int z = nz_abc - Nboudary; z < nz_abc; z++)
             {
 
@@ -963,7 +963,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             }
 
             //-------------------------------------------------------
-            // SAVE ALL THE SNAPSHOT HERE (binary document)
+            // SAVE ALL THE SNAPSHOT HERE WITH PVs+OF (binary document)
             //-------------------------------------------------------
 
             if (n == 1)
@@ -974,10 +974,10 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             if (n % 10 == 0)
             {
 
-                std::ofstream file_back("/home/processamento/acustica_2D/outputs/snapshot_back_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ofstream file_back("../outputs/snapshot_back_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
-                std::ofstream file_PVxOF_back("/home/processamento/acustica_2D/outputs/PV+OF_back_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-                std::ofstream file_PVzOF_back("/home/processamento/acustica_2D/outputs/PV+OF_back_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ofstream file_PVxOF_back("../outputs/PV+OF_back_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ofstream file_PVzOF_back("../outputs/PV+OF_back_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 for (int x = Nboudary; x < nx_abc - Nboudary; x++)
                 {
@@ -1002,7 +1002,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
             {
-                std::ifstream fwd_file("/home/processamento/acustica_2D/outputs/snapshot_fwd_" + std::to_string(fwd_index) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ifstream fwd_file("../outputs/snapshot_fwd_" + std::to_string(fwd_index) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 if (!fwd_file.is_open()) // check when opening file
                 {
@@ -1039,7 +1039,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 // PV+OF_fwd_x and PV+OF_fwd_z
                 // --------------------------------------------------------
 
-                std::ifstream fwd_ux_file("/home/processamento/acustica_2D/outputs/PV+OF_fwd_x" + std::to_string(fwd_index) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ifstream fwd_ux_file("../outputs/PV+OF_fwd_x" + std::to_string(fwd_index) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 if (!fwd_ux_file.is_open())
                 {
@@ -1055,7 +1055,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                 fwd_ux_file.close();
 
-                std::ifstream fwd_uz_file("/home/processamento/acustica_2D/outputs/PV+OF_fwd_z" + std::to_string(fwd_index) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ifstream fwd_uz_file("../outputs/PV+OF_fwd_z" + std::to_string(fwd_index) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
 
                 if (!fwd_uz_file.is_open())
                 {
@@ -1168,7 +1168,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         image[i] /= static_cast<float>(Nshots);
     }
 
-    std::ofstream img_file("/home/processamento/acustica_2D/outputs/image.bin", std::ios::binary);
+    std::ofstream img_file("../outputs/image.bin", std::ios::binary);
 
     img_file.write(reinterpret_cast<char *>(image), nx * nz * sizeof(float));
 
@@ -1176,12 +1176,12 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     std::cout << "Migrated image binary file saved!" << std::endl;
 
-    //------------------------
-    // salva o image_ADCIGs 
-    //-----------------------
+    //------------------------------------------
+    // SAVE THE DOCUMENT OF THE IMAGE_ADICIG
+    //------------------------------------------
 
-    //1 gather do CMP
-    std::string filename = "/home/processamento/acustica_2D/outputs/image_migrated_ADCIG.bin";
+    //one gather of the CMP
+    std::string filename = "../outputs/image_migrated_ADCIG.bin";
 
     std::ofstream out_file(filename, std::ios::binary);
 
@@ -1233,6 +1233,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 int main()
 {
 
+    omp_set_dynamic(0);
+
     //----------------------------------
     // open the document of PARAMETERS
     //----------------------------------
@@ -1262,7 +1264,7 @@ int main()
 
     std::cout << "Reading the document of the parameters!" << std::endl;
 
-    readParameters("/home/processamento/acustica_2D/inputs/parameters.txt", &T, &nx, &nz, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
+    readParameters("../inputs/parameters.txt", &T, &nx, &nz, &nx_abc, &nz_abc, &nt, &dx, &dz, &dt, &f0, &Nboudary, &Nsource, &nrec, receivers_file, sources_file, velocity_file, &x, &z, &t);
 
     //----------------------------------
     // open the document of RECEIVERS
@@ -1278,7 +1280,7 @@ int main()
 
     std::cout << "Reading the document of the velocity model!" << std::endl;
 
-    float *c = readVelocity("/home/processamento/acustica_2D/inputs/velocityModel.bin", nx, nz, nx_abc, nz_abc, Nboudary);
+    float *c = readVelocity(velocity_file, nx, nz, nx_abc, nz_abc, Nboudary);
 
     //------------------------------------------
     // open the document of the SOURCE
@@ -1306,7 +1308,7 @@ int main()
     // CFL check
     //----------------------------------
 
-    if(CFL(c, dt, dx, dz, nx_abc, nz_abc)){
+    if(CFL(c, dt, dx, nx_abc, nz_abc)){
 
         std::cout << "Stable simulation" << std::endl;
     }
@@ -1343,7 +1345,7 @@ int main()
     // Save binary document of the simulation
     //---------------------------------------
 
-    std::ofstream file("/home/processamento/acustica_2D/outputs/wave.bin", std::ios::binary);
+    std::ofstream file("../outputs/wave.bin", std::ios::binary);
 
     file.write(reinterpret_cast<char *>(wavefield), nx_abc * nz_abc * sizeof(float));
 
