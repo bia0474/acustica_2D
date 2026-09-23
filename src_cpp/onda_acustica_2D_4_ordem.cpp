@@ -709,7 +709,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         //-----------------------------------
 
         float v_direct = 1500.0f;
-        float shift = 0.50f;
+        float shift = 1.0f;
         float window   = 0.10f;
 
         float dz_rec = (receivers[shot].z - sz[shot]) * dz;

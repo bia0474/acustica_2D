@@ -461,7 +461,6 @@ float *createCerjanVector(int Nboudary)
 #pragma omp parallel for
     for (int i = 0; i < Nboudary; i++)
     {
-
         float fb = (float)(Nboudary - i) / (1.4142f * Sb); // for each position of the absorbent layer, a normalized distance is calculated
 
         A[i] = std::exp(-fb * fb); // the coefficients follow a Gaussian curve, where a smooth transition occurs
@@ -584,8 +583,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         std::fill(ux_back, ux_back + nx_abc * nz_abc, 0.0f);
         std::fill(uz_back, uz_back + nx_abc * nz_abc, 0.0f);
 
-        int cmp_x = ((sx[shot] - Nboudary) + (receivers[shot].x - Nboudary)) / 2;
-
         //-----------------------------------
         // trace with mute 
         //-----------------------------------
@@ -632,7 +629,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i - 1)] - u_curr[j * nz_abc + (i - 2)]) / (12 * dz * dz);
 
                     u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
-                    
 
                     //----------------------------------
                     // Poynting vectors + Optical Flow
@@ -641,9 +637,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     if (n % 10 == 0)
                     {
                         float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i]) / dt;
-
                         float Ux = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i]) / (12 * dx);
-
                         float Uz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)]) / (12 * dz);
 
                         //--------------------------------------
@@ -654,6 +648,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                         pz_fwd[j * nz_abc + i] = Uz;
                         pt_fwd[j * nz_abc + i] = dUdt;
                     }
+
                 }
             }
 
@@ -830,9 +825,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     if (n % 10 == 0)
                     {
                         float dUdt = (u_back_next[j * nz_abc + i] - u_back_curr[j * nz_abc + i]) / dt;
-
                         float Ux = (u_back_curr[(j - 2) * nz_abc + i] - 8 * u_back_curr[(j - 1) * nz_abc + i] + 8 * u_back_curr[(j + 1) * nz_abc + i] - u_back_curr[(j + 2) * nz_abc + i]) / (12 * dx);
-
                         float Uz = (u_back_curr[j * nz_abc + (i - 2)] - 8 * u_back_curr[j * nz_abc + (i - 1)] + 8 * u_back_curr[j * nz_abc + (i + 1)] - u_back_curr[j * nz_abc + (i + 2)]) / (12 * dz);
 
                         //--------------------------------------
@@ -843,6 +836,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                         pz_back[j * nz_abc + i] = Uz;
                         pt_back[j * nz_abc + i] = dUdt;
                     }
+
                 }
             }
 
@@ -1084,6 +1078,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                         float m_b = sqrt(ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * ux_back[(j + Nboudary) * nz_abc + (i + Nboudary)] + uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)] * uz_back[(j + Nboudary) * nz_abc + (i + Nboudary)]);
                         if (m_b > max_amp_back) max_amp_back = m_b;
+
                     }
                 }
                 
@@ -1105,8 +1100,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                         int bin_angle = -1; //guarda o índice do bin de ângulo onde -1 signiifca "não classificado"
                         
-                        const int min_imaging_z = 10;
-
                         if (modulo_fwd > thresh_fwd && modulo_back > thresh_back) //só deixa passar pontos com amplitude genuína o suficiente para confiar na direção estimada
                         {
                             //definição de cosseno do ângulo entre dois vetores:
@@ -1121,17 +1114,17 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                             //Se o ângulo estiver no intervalo físico esperado [0°, 90°), calcula em qual bin discreto ele cai, dividindo pelo tamanho do passo de ângulo (angle_step) 
                             // e truncando para inteiro. Por exemplo, se angle_step = 5° e theta = 23°, então gather = 4 (bin de 20°–25°)
                             
-                            if (theta[j * nz + i] >= 0.0f && theta[j * nz + i] < 90.0f)
+                            if (theta[j * nz + i] >= 0.0f && theta[j * nz + i] < max_angle)
                             {
                                 bin_angle = (int)(theta[j * nz + i] / angle_step);
                             }
                         }
 
-                        if (bin_angle >= 0 && std::abs(j - cmp_x) <= 2 && i >= min_imaging_z)
+                        if (bin_angle >= 0)
                         {
                             image_ADCIGs[bin_angle * n_gathers * nz + i] += u_fwd_n[j * nz + i] * u_back_next[(j + Nboudary) * nz_abc + (i + Nboudary)];
 
-                            adcig_fold[bin_angle * n_gathers * nz + i]++;
+                            adcig_fold[bin_angle * n_gathers * nz + i]++; //incrementa o contador de contribuições para cada bin de ângulo e profundidade
                         }
                     }
                 }
@@ -1195,7 +1188,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     {
         if (adcig_fold[i] > 0)
         {
-            image_ADCIGs[i] /= static_cast<float>(adcig_fold[i]);
+            image_ADCIGs[i] /= static_cast<float>(adcig_fold[i]); //normaliza o gather pelo número de contribuições
         }
     }
 
@@ -1233,7 +1226,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 int main()
 {
 
-    omp_set_dynamic(0);
+    omp_set_dynamic(0); // Disable dynamic adjustment of the number of threads
+    omp_set_num_threads(omp_get_max_threads()); // Set the number of threads to the maximum available
 
     //----------------------------------
     // open the document of PARAMETERS

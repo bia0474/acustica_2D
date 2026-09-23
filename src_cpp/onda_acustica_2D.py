@@ -1080,7 +1080,7 @@ plt.show()
 
 outdir = "/home/processamento/acustica_2D/outputs"
 angle_step = 5
-n_angle_bins = 18  # ajuste conforme o binning real usado no C++
+n_angle_bins = 18  # bins de 0 a 90 graus, com passo de 5 graus
 
 #-----------------------------------------------
 # le o arquivo unico (ja combina todos os shots empilhados)
@@ -1117,14 +1117,25 @@ fig, ax = plt.subplots(figsize=(6, 8))
 if panel_max > 1e-12:
 
     # ---- fundo: density plot suavizado ----
-    ax.imshow(panel_data, cmap="gray", vmin=-panel_max, vmax=panel_max, extent=[0, n_angle_bins * angle_step, z_axis[-1], z_axis[0]], aspect="auto", origin="upper", interpolation="bilinear")
+    image_plot = ax.imshow(panel_data, cmap="gray", vmin=-panel_max, vmax=panel_max, extent=[0, n_angle_bins * angle_step, z_axis[-1], z_axis[0]], aspect="auto", origin="upper", interpolation="bilinear")
+
+    fig.colorbar(image_plot, ax=ax, label="Amplitude")
+
+    # ---- tracos wiggle sobrepostos, um para cada bin angular ----
+    trace_half_width = 0.42 * angle_step
+    for bin_index in range(n_angle_bins):
+        trace = panel_data[:, bin_index]
+        angle_center = (bin_index + 0.5) * angle_step
+        trace_scale = trace_half_width / panel_max
+        ax.plot(angle_center + trace * trace_scale, z_axis, color="black", linewidth=0.55)
+        ax.axvline(angle_center, color="black", linewidth=0.25, alpha=0.25)
 
 else:
     print("Aviso: painel sem energia (todos os valores proximos de zero).")
 
 ax.set_ylabel("z (m)")
 ax.set_xlabel("Ângulo de abertura (graus)")
-ax.set_xticks(np.arange(0, 91, 10))
+ax.set_xticks(np.arange(0, 71, 5))
 ax.set_title("ADCIG - CMP empilhado", fontsize=14, fontweight="bold")
 ax.set_xlim(0, n_angle_bins * angle_step)
 
