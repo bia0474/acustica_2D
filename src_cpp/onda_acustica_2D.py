@@ -6,6 +6,7 @@ from matplotlib.colors import Normalize
 from scipy.ndimage import laplace
 import pandas as pd
 import os
+import re
 
 #----------------------------------
 # PARAMETERS
@@ -28,32 +29,10 @@ dx = float(parameters["dx"])
 dz = float(parameters["dz"])
 dt = float(parameters["dt"])
 
-nrec = int(parameters["nrec"])
+nrec = int(parameters.get("nrec", 0))
 Nboudary = int(parameters["Nboudary"])
 
 '''
-#----------------------------------
-# plot one snap of the simulation
-#----------------------------------
-
-data = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_500.bin", dtype=np.float32)
-
-wavefield = data.reshape((nx, nz))
-
-plt.figure(figsize=(8,6))
-
-plt.imshow(wavefield.T, cmap="seismic", origin="upper", extent=[0, nx * dx, nz * dz, 0], aspect="auto")
-
-plt.colorbar(label="Amplitude")
-
-plt.xlabel("x (m)")
-plt.ylabel("z (m)")
-
-plt.title("Wavefield Snapshot")
-
-plt.show()
-
-
 #----------------------------------
 # plot two snapshots side by side
 #----------------------------------
@@ -260,14 +239,14 @@ plt.show()
 
 print(f"Erro angular mediano: {np.nanmedian(angle_diff):.2f} graus")
 print(f"Erro angular médio:   {np.nanmean(angle_diff):.2f} graus")
-
+'''
 #---------------------------------------------
 # animation with Poynting vectors (Direction)
 #---------------------------------------------
 
 fig, ax = plt.subplots(figsize=(8,6))
 
-step = 30
+step = 20
 
 x = np.arange(nx) * dx
 z = np.arange(nz) * dz
@@ -285,26 +264,31 @@ def get_direction_colors(V):
     return np.where(V > 0, "black", "green").flatten()
 
 # primeiro frame
-wave = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_100.bin", dtype=np.float32).reshape(nx,nz)
+wave = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
-PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX100.bin", dtype=np.float32).reshape(nx,nz)
+PVx = np.fromfile("/home/processamento/acustica_2D/outputs/PVx_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
-PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ100.bin", dtype=np.float32).reshape(nx,nz)
+PVz = np.fromfile("/home/processamento/acustica_2D/outputs/PVz_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
 PVx, PVz = normalize_vectors(PVx, PVz)
 
 img = ax.imshow(wave.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], interpolation="bilinear", aspect="auto")
+
+ax.set_xlabel("x (m)")
+ax.set_ylabel("z (m)")
+
+ax.set_title("Poynting Vector Direction")
 
 Vplot = -PVz[::step,::step]
 quiv = ax.quiver(X[::step,::step], Z[::step,::step], PVx[::step,::step], Vplot, color=get_direction_colors(Vplot), pivot="mid", scale=30, width=0.003)
 
 def update(n):
 
-    wave = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_{n}.bin", dtype=np.float32).reshape(nx,nz)
+    wave = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
-    PVx = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionX{n}.bin", dtype=np.float32).reshape(nx,nz)
+    PVx = np.fromfile(f"/home/processamento/acustica_2D/outputs/PVx_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
-    PVz = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorDirectionZ{n}.bin", dtype=np.float32).reshape(nx,nz)
+    PVz = np.fromfile(f"/home/processamento/acustica_2D/outputs/PVz_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
     PVx, PVz = normalize_vectors(PVx, PVz)
 
@@ -316,9 +300,9 @@ def update(n):
 
     return img, quiv
 
-ani = animation.FuncAnimation(fig, update, frames=range(100, 4000, 100), interval=900, blit=True)
+ani = FuncAnimation(fig, update, frames=range(100, 4000, 100), interval=900, blit=True)
 
-ani.save("/home/processamento/acustica_2D/outputs/poynting_direction.gif", writer=animation.PillowWriter(fps=0.8))
+ani.save("/home/processamento/acustica_2D/outputs/poynting_direction.gif", writer=PillowWriter(fps=0.8))
 
 plt.colorbar(img, label="Amplitude")
 
@@ -332,26 +316,31 @@ plt.show()
 fig2, ax2 = plt.subplots(figsize=(8,6))
 
 # primeiro frame
-wave2 = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_100.bin", dtype=np.float32).reshape(nx,nz)
+wave2 = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
-PVx_OF = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFx100.bin", dtype=np.float32).reshape(nx,nz)
+PVx_OF = np.fromfile("/home/processamento/acustica_2D/outputs/OFx_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
-PVz_OF = np.fromfile("/home/processamento/acustica_2D/outputs/PoyntingVectorOFz100.bin", dtype=np.float32).reshape(nx,nz)
+PVz_OF = np.fromfile("/home/processamento/acustica_2D/outputs/OFz_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
 PVx_OF, PVz_OF = normalize_vectors(PVx_OF, PVz_OF)
 
 img2 = ax2.imshow(wave2.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], interpolation="bilinear", aspect="auto")
+
+ax2.set_xlabel("x (m)")
+ax2.set_ylabel("z (m)")
+
+ax2.set_title("Optical Flow")
 
 Vplot2 = -PVz_OF[::step,::step]
 quiv2 = ax2.quiver(X[::step,::step], Z[::step,::step], PVx_OF[::step,::step], Vplot2, color=get_direction_colors(Vplot2), pivot="mid", scale=30, width=0.003)
 
 def update2(n):
 
-    wave2 = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_{n}.bin", dtype=np.float32).reshape(nx,nz)
+    wave2 = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
-    PVx_OF = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorOFx{n}.bin", dtype=np.float32).reshape(nx,nz)
+    PVx_OF = np.fromfile(f"/home/processamento/acustica_2D/outputs/OFx_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
-    PVz_OF = np.fromfile(f"/home/processamento/acustica_2D/outputs/PoyntingVectorOFz{n}.bin", dtype=np.float32).reshape(nx,nz)
+    PVz_OF = np.fromfile(f"/home/processamento/acustica_2D/outputs/OFz_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
 
     PVx_OF, PVz_OF = normalize_vectors(PVx_OF, PVz_OF)
 
@@ -363,14 +352,79 @@ def update2(n):
 
     return img2, quiv2
 
-ani2 = animation.FuncAnimation(fig2, update2, frames=range(100, 4000, 100), interval=900, blit=True)
+ani2 = FuncAnimation(fig2, update2, frames=range(100, 4000, 100), interval=900, blit=True)
 
-ani2.save("/home/processamento/acustica_2D/outputs/poynting_of.gif", writer=animation.PillowWriter(fps=0.8))
+ani2.save("/home/processamento/acustica_2D/outputs/poynting_of.gif", writer=PillowWriter(fps=0.8))
 
 plt.colorbar(img2, label="Amplitude")
 
 plt.show()
-'''
+
+
+#--------------------------------------------------
+# animation with Poynting vectors and Optical Flow side by side
+#--------------------------------------------------
+
+fig3, (ax3, ax4) = plt.subplots(1, 2, figsize=(14, 6), sharex=True, sharey=True)
+
+wave3 = np.fromfile("/home/processamento/acustica_2D/outputs/snapshot_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+
+PVx3 = np.fromfile("/home/processamento/acustica_2D/outputs/PVx_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+PVz3 = np.fromfile("/home/processamento/acustica_2D/outputs/PVz_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+
+OFx3 = np.fromfile("/home/processamento/acustica_2D/outputs/OFx_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+OFz3 = np.fromfile("/home/processamento/acustica_2D/outputs/OFz_fwd_100_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+
+PVx3, PVz3 = normalize_vectors(PVx3, PVz3)
+OFx3, OFz3 = normalize_vectors(OFx3, OFz3)
+
+img3 = ax3.imshow(wave3.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], interpolation="bilinear", aspect="auto")
+img4 = ax4.imshow(wave3.T, cmap="seismic", origin="upper", extent=[0,nx * dx,nz * dz,0], interpolation="bilinear", aspect="auto")
+
+Vplot3 = -PVz3[::step,::step]
+Vplot4 = -OFz3[::step,::step]
+quiv3 = ax3.quiver(X[::step,::step], Z[::step,::step], PVx3[::step,::step], Vplot3, color=get_direction_colors(Vplot3), pivot="mid", scale=30, width=0.003)
+quiv4 = ax4.quiver(X[::step,::step], Z[::step,::step], OFx3[::step,::step], Vplot4, color=get_direction_colors(Vplot4), pivot="mid", scale=30, width=0.003)
+
+ax3.set_title("Poynting Vector")
+ax4.set_title("Optical Flow")
+for axis in (ax3, ax4):
+    axis.set_xlabel("x (m)")
+    axis.set_ylabel("z (m)")
+
+def update_side_by_side(n):
+
+    wave3 = np.fromfile(f"/home/processamento/acustica_2D/outputs/snapshot_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+
+    PVx3 = np.fromfile(f"/home/processamento/acustica_2D/outputs/PVx_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+    PVz3 = np.fromfile(f"/home/processamento/acustica_2D/outputs/PVz_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+
+    OFx3 = np.fromfile(f"/home/processamento/acustica_2D/outputs/OFx_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+    OFz3 = np.fromfile(f"/home/processamento/acustica_2D/outputs/OFz_fwd_{n}_duas_fontes.bin", dtype=np.float32).reshape(nx,nz)
+
+    PVx3, PVz3 = normalize_vectors(PVx3, PVz3)
+    OFx3, OFz3 = normalize_vectors(OFx3, OFz3)
+
+    img3.set_data(wave3.T)
+    img4.set_data(wave3.T)
+
+    Vplot3 = -PVz3[::step,::step]
+    Vplot4 = -OFz3[::step,::step]
+    quiv3.set_UVC(PVx3[::step,::step], Vplot3)
+    quiv3.set_color(get_direction_colors(Vplot3))
+    quiv4.set_UVC(OFx3[::step,::step], Vplot4)
+    quiv4.set_color(get_direction_colors(Vplot4))
+
+    return img3, img4, quiv3, quiv4
+
+ani3 = FuncAnimation(fig3, update_side_by_side, frames=range(100, 4000, 100), interval=900, blit=True)
+
+ani3.save("/home/processamento/acustica_2D/outputs/poynting_vs_optical_flow.gif", writer=PillowWriter(fps=0.8))
+
+plt.colorbar(img3, ax=(ax3, ax4), label="Amplitude")
+
+plt.show()
+
 '''
 #-------------------------------------
 # animatiom 2D acustic wave - backward
@@ -501,15 +555,15 @@ fig, ax = plt.subplots(figsize=(12, 4))
 im = ax.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], cmap="viridis", aspect="auto")
 
 # linhas ligando cada par fonte-receptor, pra visualizar o offset/midpoint do CMP
-for i in range(len(src_x)):
-    ax.plot([src_x[i], rec_x[i]], [src_z[i], rec_z[i]], color="white", linewidth=0.5, alpha=0.5, zorder=4)
+# for i in range(len(src_x)):
+    # ax.plot([src_x[i], rec_x[i]], [src_z[i], rec_z[i]], color="white", linewidth=0.5, alpha=0.5, zorder=4)
 
-ax.scatter(rec_x, rec_z, marker="v", color="green", s=40, label=f"Receivers (n={len(rec_x)})", zorder=5)
+# ax.scatter(rec_x, rec_z, marker="v", color="green", s=40, label=f"Receivers (n={len(rec_x)})", zorder=5)
 ax.scatter(src_x, src_z, marker="*", color="yellow", s=150, edgecolor="k", linewidth=0.6, label=f"Sources (n={len(src_x)})", zorder=6)
 
 ax.set_xlabel("Distância (m)")
 ax.set_ylabel("Profundidade (m)")
-ax.set_title("Geometria CMP sobre o modelo de velocidades")
+ax.set_title("Geometria sobre o modelo de velocidades")
 ax.legend(loc="lower right", fontsize=9, framealpha=0.9)
 
 cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
@@ -1135,7 +1189,7 @@ else:
 
 ax.set_ylabel("z (m)")
 ax.set_xlabel("Ângulo de abertura (graus)")
-ax.set_xticks(np.arange(0, 71, 5))
+ax.set_xticks(np.arange(0, 91, 5))
 ax.set_title("ADCIG - CMP empilhado", fontsize=14, fontweight="bold")
 ax.set_xlim(0, n_angle_bins * angle_step)
 
