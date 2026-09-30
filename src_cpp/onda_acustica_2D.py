@@ -652,9 +652,7 @@ plt.figure(figsize=(6, 8))
 
 vmax = np.percentile(np.abs(image), 99) if np.any(image) else 1.0
 
-plt.imshow(image.T, cmap="gray", aspect="auto",
-           extent=[0, nx * dx, nz * dz, 0],
-           vmin=-vmax, vmax=vmax)
+plt.imshow(image.T, cmap="gray", aspect="auto", extent=[0, nx * dx, nz * dz, 0],vmin=-vmax, vmax=vmax)
 
 plt.xlabel("x (m)")
 
