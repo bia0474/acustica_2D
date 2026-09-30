@@ -239,7 +239,7 @@ plt.show()
 
 print(f"Erro angular mediano: {np.nanmedian(angle_diff):.2f} graus")
 print(f"Erro angular médio:   {np.nanmean(angle_diff):.2f} graus")
-'''
+
 #---------------------------------------------
 # animation with Poynting vectors (Direction)
 #---------------------------------------------
@@ -360,7 +360,6 @@ plt.colorbar(img2, label="Amplitude")
 
 plt.show()
 
-
 #--------------------------------------------------
 # animation with Poynting vectors and Optical Flow side by side
 #--------------------------------------------------
@@ -425,7 +424,6 @@ plt.colorbar(img3, ax=(ax3, ax4), label="Amplitude")
 
 plt.show()
 
-'''
 #-------------------------------------
 # animatiom 2D acustic wave - backward
 #-------------------------------------
@@ -554,11 +552,11 @@ fig, ax = plt.subplots(figsize=(12, 4))
 
 im = ax.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], cmap="viridis", aspect="auto")
 
-# linhas ligando cada par fonte-receptor, pra visualizar o offset/midpoint do CMP
-# for i in range(len(src_x)):
-    # ax.plot([src_x[i], rec_x[i]], [src_z[i], rec_z[i]], color="white", linewidth=0.5, alpha=0.5, zorder=4)
+linhas ligando cada par fonte-receptor, pra visualizar o offset/midpoint do CMP
+for i in range(len(src_x)):
+    ax.plot([src_x[i], rec_x[i]], [src_z[i], rec_z[i]], color="white", linewidth=0.5, alpha=0.5, zorder=4)
 
-# ax.scatter(rec_x, rec_z, marker="v", color="green", s=40, label=f"Receivers (n={len(rec_x)})", zorder=5)
+ax.scatter(rec_x, rec_z, marker="v", color="green", s=40, label=f"Receivers (n={len(rec_x)})", zorder=5)
 ax.scatter(src_x, src_z, marker="*", color="yellow", s=150, edgecolor="k", linewidth=0.6, label=f"Sources (n={len(src_x)})", zorder=6)
 
 ax.set_xlabel("Distância (m)")
@@ -639,7 +637,7 @@ plt.title("Seismogram - with mute")
 plt.colorbar()
 
 plt.show()
-'''
+
 #----------------------------------
 # PLOT THE MIGRATED IMAGE
 #----------------------------------
@@ -750,7 +748,7 @@ fig3.colorbar(sm, ax=ax3, fraction=0.046, pad=0.04)
 plt.tight_layout()
 
 plt.show()
-'''
+
 #----------------------------------
 # image of the ADCIGs
 #----------------------------------

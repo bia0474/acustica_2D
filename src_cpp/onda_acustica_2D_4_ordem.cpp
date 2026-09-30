@@ -18,6 +18,79 @@ typedef struct
     int z;
 } Receiver;
 
+//-----------------------------------
+// function that performs Direct Wave Mute 
+//-----------------------------------
+
+void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver *receivers, int *sx, int *sz, float dx, float dz){
+
+    float v_direct = 1500.0f;
+    float shift = 1.0f;
+    float window   = 0.10f;
+
+    float dz_rec = (receivers[shot].z - sz[shot]) * dz;
+    float dx_rec = (receivers[shot].x - sx[shot]) * dx;
+
+    float dist = std::sqrt(dz_rec * dz_rec + dx_rec * dx_rec);
+
+    float traveltime = (dist / v_direct) + shift;
+
+    float t1 = traveltime;
+    float t2 = t1 + window;
+
+    for (int it = 0; it < nt; it++)
+    {
+        float t = it * dt;
+
+        if (t < t1)
+        {
+            seismogram_shot[it] = 0.0f;
+        }
+        else if (t < t2)
+        {
+            seismogram_shot[it] *= (t - t1) / (t2 - t1);
+        }
+    }
+
+}
+
+//-------------------------------------------------------
+// function to save the seismogram of each shot (binary document)
+//-------------------------------------------------------
+
+void saveSeismogram(const float *seismogram_shot, std::string filename, int nt, int shot)
+{
+    std::ofstream file(filename, std::ios::binary);
+            
+    if(!file.is_open()){
+        std::cout << "Erro ao abrir " << filename << "\n";
+        exit(1);
+    }
+
+    file.write(reinterpret_cast<const char*>(seismogram_shot), nt * sizeof(float));
+    file.close();
+
+}
+
+//-------------------------------------------------------
+// function to save all the snapshots here (binary document)
+//-------------------------------------------------------
+
+void saveSnapshots(const float *u_next, std::string filename, int nx_abc, int nz_abc, int Nboudary, int n, int shot)
+{
+    std::ofstream file_fwd(filename, std::ios::binary);
+
+    for (int x = Nboudary; x < nx_abc - Nboudary; x++)
+    {
+
+        file_fwd.write(reinterpret_cast<const char *>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
+
+    }
+
+    file_fwd.close();
+
+}
+
 //----------------------------------
 // linscpace function
 //----------------------------------
@@ -649,29 +722,21 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             seismogram_shot[n] = u_next[xr * nz_abc + zr];
             
             //-------------------------------------------------------
-            // SAVE ALL THE SNAPSHOT HERE (binary document)
+            // save the snapshots of the forward field (binary document)
             //-------------------------------------------------------
-
-            if (n == 1)
+            
+            if(n == 1)
             {
-                std::cout << "Saving the file of the snapshots of the forward!" << std::endl;
+                std::cout << "Saving the snapshot of the forward field" << std::endl;
             }
 
             if (n % 10 == 0)
             {
-
-                std::ofstream file_fwd("../outputs/snapshot_fwd_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-
-                for (int x = Nboudary; x < nx_abc - Nboudary; x++)
-                {
-
-                    file_fwd.write(reinterpret_cast<char *>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
-
-                }
-
-                file_fwd.close();
+                std::string filename = "../outputs/snapshot_fwd_" + std::to_string(n) + "_shot_" + std::to_string(shot) + ".bin";
+                
+                saveSnapshots(u_next, filename, nx_abc, nz_abc, Nboudary, n, shot);
             }
-            
+
             //----------------------------------
             // advance in time
             //----------------------------------
@@ -683,18 +748,12 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         //-----------------------------------------------------
         // salva o sismograma deste tiro em um arquivo separado
         //-----------------------------------------------------
+        
+        std::cout << "Saving the seismogram of shot " << shot << std::endl;
 
         std::string filename = "../outputs/seismogram_shot" + std::to_string(shot) + ".bin";
 
-        std::ofstream file(filename, std::ios::binary);
-            
-        if(!file.is_open()){
-            std::cout << "Erro ao abrir " << filename << "\n";
-            exit(1);
-        }
-
-        file.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
-        file.close();
+        saveSeismogram(seismogram_shot, filename, nt, shot);
 
         std::cout << "Sismograma do tiro " << shot << " salvo em " << filename << "\n";
         
@@ -702,39 +761,17 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         // salva um gather do CMP sem mute
         //-----------------------------------
 
+        std::cout << "Saving the CMP gather (without mute) of shot " << shot << std::endl;
+
         file_cmp.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
 
         //-----------------------------------
         // Direct Wave Mute 
         //-----------------------------------
 
-        float v_direct = 1500.0f;
-        float shift = 1.0f;
-        float window   = 0.10f;
+        std::cout << "Applying Direct Wave Mute to the seismogram of shot " << shot << std::endl;
 
-        float dz_rec = (receivers[shot].z - sz[shot]) * dz;
-        float dx_rec = (receivers[shot].x - sx[shot]) * dx;
-
-        float dist = std::sqrt(dz_rec * dz_rec + dx_rec * dx_rec);
-
-        float traveltime = (dist / v_direct) + shift;
-
-        float t1 = traveltime;
-        float t2 = t1 + window;
-
-        for (int it = 0; it < nt; it++)
-        {
-            float t = it * dt;
-
-            if (t < t1)
-            {
-                seismogram_shot[it] = 0.0f;
-            }
-            else if (t < t2)
-            {
-                seismogram_shot[it] *= (t - t1) / (t2 - t1);
-            }
-        }
+        directWaveMute(seismogram_shot, nt, dt, shot, receivers, sx, sz, dx, dz);
 
         //------------------------------------------------------------------
         // salva o sismograma deste tiro COM MUTE, em arquivo separado
@@ -742,22 +779,15 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         std::string filename_mute = "../outputs/seismogram_shot" + std::to_string(shot) + "_mute.bin";
 
-        std::ofstream file_mute(filename_mute, std::ios::binary);
-
-        if(!file_mute.is_open()){
-            std::cout << "Erro ao abrir " << filename_mute << "\n";
-            exit(1);
-        }
-
-        file_mute.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));  
-
-        file_mute.close();
+        saveSeismogram(seismogram_shot, filename_mute, nt, shot);
 
         std::cout << "Sismograma do tiro " << shot << " COM MUTE salvo em " << filename_mute << "\n";
 
         //-----------------------------------
         // salva um gather do CMP com mute
         //-----------------------------------
+
+        std::cout << "Saving the CMP gather (with mute) of shot " << shot << std::endl;
 
         file_cmp_mute.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
 
@@ -909,6 +939,8 @@ int main()
     //---------------------------------------
     // Save binary document of the simulation
     //---------------------------------------
+
+    std::cout << "Saving the wavefield binary file!" << std::endl;
 
     std::ofstream file("../outputs/wave.bin", std::ios::binary);
 
