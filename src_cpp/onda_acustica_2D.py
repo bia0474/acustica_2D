@@ -637,7 +637,7 @@ plt.title("Seismogram - with mute")
 plt.colorbar()
 
 plt.show()
-
+'''
 #----------------------------------
 # PLOT THE MIGRATED IMAGE
 #----------------------------------
@@ -749,8 +749,9 @@ plt.tight_layout()
 
 plt.show()
 
+'''
 #----------------------------------
-# image of the ADCIGs
+# image of the ADCIGs - vários gathers
 #----------------------------------
 
 #lendo os 18 arquivos em binário, cada um contendo uma imagem migrada referente àquela faixa de ângulo

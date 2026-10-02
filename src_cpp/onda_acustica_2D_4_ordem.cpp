@@ -18,9 +18,9 @@ typedef struct
     int z;
 } Receiver;
 
-//-----------------------------------
+//----------------------------------------
 // function that performs Direct Wave Mute 
-//-----------------------------------
+//----------------------------------------
 
 void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver *receivers, int *sx, int *sz, float dx, float dz){
 
@@ -54,9 +54,9 @@ void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver
 
 }
 
-//-------------------------------------------------------
+//---------------------------------------------------------------
 // function to save the seismogram of each shot (binary document)
-//-------------------------------------------------------
+//---------------------------------------------------------------
 
 void saveSeismogram(const float *seismogram_shot, std::string filename, int nt, int shot)
 {
@@ -73,9 +73,9 @@ void saveSeismogram(const float *seismogram_shot, std::string filename, int nt, 
 
 }
 
-//-------------------------------------------------------
+//----------------------------------------------------------
 // function to save all the snapshots here (binary document)
-//-------------------------------------------------------
+//----------------------------------------------------------
 
 void saveSnapshots(const float *u_next, std::string filename, int nx_abc, int nz_abc, int Nboudary, int n, int shot)
 {
@@ -545,7 +545,7 @@ float *createCerjanVector(int Nboudary)
         return NULL; // null means it's not pointing anywhere
     }
 
-#pragma omp parallel for
+#pragma acc parallel loop copyout(A[0:Nboudary])
     for (int i = 0; i < Nboudary; i++)
     {
 
@@ -568,7 +568,7 @@ float *source(float f0, const float *t, int nt)
 
     float t0 = 1.0 / f0; // wavelet time delay
 
-#pragma omp parallel for
+#pragma acc parallel loop copyin(t[0:nt]) copyout(s[0:nt])
     for (int n = 0; n < nt; n++)
     {
 
@@ -613,6 +613,9 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     std::ofstream file_cmp("../outputs/cmp_gather.bin", std::ios::binary);
     std::ofstream file_cmp_mute("../outputs/cmp_gather_mute.bin", std::ios::binary);
 
+    const int N = nx_abc * nz_abc;
+
+#pragma acc data copyin(c[0:N], A[0:Nboudary], fonte[0:nt]) \ copy(u_curr[0:N], u_next[0:N])
     for (int shot = 0; shot < Nshots; shot++)
     {
         std::cout << "Tiro " << shot << "\n";
@@ -628,7 +631,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             // space loop - 4nd order
             //----------------------------------
 
-            #pragma omp parallel for collapse(2) schedule(static)
+            #pragma acc parallel loop collapse(2)
             for (int j = 2; j < nx_abc - 2; j++)
             { // traverses all points of the grid in X
 
@@ -663,50 +666,46 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 std::cout << "Making the CERJAN boudary of the forward" << std::endl;
             }
 
-            #pragma omp parallel for collapse(2)
+            #pragma acc parallel loop collapse(2)
             for (int x = 0; x < Nboudary; x++)
             { // Left
 
                 for (int z = 0; z < nz_abc; z++)
                 {
-
                     u_next[x * nz_abc + z] *= A[x];
                     u_curr[x * nz_abc + z] *= A[x];
                 }
             }
 
+            #pragma acc parallel loop collapse(2)
             for (int x = nx_abc - Nboudary; x < nx_abc; x++)
             { // right
-
-                int k = nx_abc - 1 - x;
-
                 for (int z = 0; z < nz_abc; z++)
                 {
+                    const int k = nx_abc - 1 - x;
 
                     u_next[x * nz_abc + z] *= A[k];
                     u_curr[x * nz_abc + z] *= A[k];
                 }
             }
 
-            #pragma omp parallel for collapse(2)
+            #pragma acc parallel loop collapse(2)
             for (int z = 0; z < Nboudary; z++)
             { // Top
 
                 for (int x = 0; x < nx_abc; x++)
                 {
-
                     u_next[x * nz_abc + z] *= A[z];
                     u_curr[x * nz_abc + z] *= A[z];
                 }
             }
 
+            #pragma acc parallel loop collapse(2)
             for (int z = nz_abc - Nboudary; z < nz_abc; z++)
             {
-
-                int k = nz_abc - 1 - z;
-
                 for (int x = 0; x < nx_abc; x++)
                 { // Base
+                    const int k = nz_abc - 1 - z;
 
                     u_next[x * nz_abc + z] *= A[k];
                     u_curr[x * nz_abc + z] *= A[k];
