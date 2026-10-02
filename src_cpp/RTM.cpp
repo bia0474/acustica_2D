@@ -17,6 +17,139 @@ typedef struct
     int z;
 } Receiver;
 
+
+//-------------------------------------------------------
+// Horn-Schunck optical flow for any wavefield
+//-------------------------------------------------------
+
+void opticalFlow(float *ux, float *uz, const float *px, const float *pz, const float *pt, int nx_abc, int nz_abc, float alpha, int n_iter)
+{
+    float *ux_temp = (float *)malloc(nx_abc * nz_abc * sizeof(float));
+    float *uz_temp = (float *)malloc(nx_abc * nz_abc * sizeof(float));
+
+    if (ux_temp == NULL || uz_temp == NULL)
+    {
+        free(ux_temp);
+        free(uz_temp);
+        return;
+    }
+
+    std::copy(ux, ux + nx_abc * nz_abc, ux_temp);
+    std::copy(uz, uz + nx_abc * nz_abc, uz_temp);
+
+    float *ux_current = ux;
+    float *uz_current = uz;
+    float *ux_next = ux_temp;
+    float *uz_next = uz_temp;
+
+    for (int iter = 0; iter < n_iter; iter++)
+    {
+        #pragma omp parallel for collapse(2) schedule(static)
+        for (int j = 2; j < nx_abc - 2; j++)
+        {
+            for (int i = 2; i < nz_abc - 2; i++)
+            {
+                float sum_ux = 0.0f;
+                float sum_uz = 0.0f;
+
+                for (int a = -1; a <= 1; a++)
+                {
+                    for (int b = -1; b <= 1; b++)
+                    {
+                        sum_ux += ux_current[(j + a) * nz_abc + (i + b)];
+                        sum_uz += uz_current[(j + a) * nz_abc + (i + b)];
+                    }
+                }
+
+                const float ux_average = (1.0f / 12.0f) * (ux_current[j * nz_abc + i - nz_abc] + ux_current[j * nz_abc + i + nz_abc] + ux_current[j * nz_abc + i - 1] + ux_current[j * nz_abc + i + 1] - ux_current[j * nz_abc + i] + sum_ux);
+                const float uz_average = (1.0f / 12.0f) * (uz_current[j * nz_abc + i - nz_abc] + uz_current[j * nz_abc + i + nz_abc] + uz_current[j * nz_abc + i - 1] + uz_current[j * nz_abc + i + 1] - uz_current[j * nz_abc + i] + sum_uz);
+                const float denominator = alpha * alpha + px[j * nz_abc + i] * px[j * nz_abc + i] + pz[j * nz_abc + i] * pz[j * nz_abc + i];
+
+                if (denominator > 0.0f)
+                {
+                    const float correction = (px[j * nz_abc + i] * ux_average + pz[j * nz_abc + i] * uz_average + pt[j * nz_abc + i]) / denominator;
+                    ux_next[j * nz_abc + i] = ux_average - px[j * nz_abc + i] * correction;
+                    uz_next[j * nz_abc + i] = uz_average - pz[j * nz_abc + i] * correction;
+                }
+                else
+                {
+                    ux_next[j * nz_abc + i] = ux_average;
+                    uz_next[j * nz_abc + i] = uz_average;
+                }
+            }
+        }
+
+        std::swap(ux_current, ux_next);
+        std::swap(uz_current, uz_next);
+    }
+
+    if (ux_current != ux)
+    {
+        std::copy(ux_current, ux_current + nx_abc * nz_abc, ux);
+        std::copy(uz_current, uz_current + nx_abc * nz_abc, uz);
+    }
+
+    free(ux_temp);
+    free(uz_temp);
+}
+
+//--------------------------------------------------
+// Calculate wavefield derivatives for Optical Flow
+//--------------------------------------------------
+
+void calculateWavefieldDerivatives(const float *u_curr, const float *u_next, float *px, float *pz, float *pt, float dt, float dx, float dz, int nx_abc, int nz_abc)
+{
+    #pragma omp parallel for collapse(2) schedule(static)
+    for (int j = 2; j < nx_abc - 2; j++)
+    { // traverses all points of the grid in X
+
+        for (int i = 2; i < nz_abc - 2; i++)
+        {
+            pt[j * nz_abc + i] = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i]) / dt;
+            px[j * nz_abc + i] = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i]) / (12 * dx);
+            pz[j * nz_abc + i] = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)]) / (12 * dz);
+        }
+    }
+}
+
+//-------------------------------------------------------
+// function to save all the PVs+OF here (binary document)
+//-------------------------------------------------------
+
+void saveSnapshots(std::string filenamex, std::string filenamez, int nx_abc, int nz_abc, int Nboudary, int n, int shot, const float *ux_fwd, const float *uz_fwd)
+{
+    std::ofstream file_PVxOF_fwd(filenamex, std::ios::binary);
+    std::ofstream file_PVzOF_fwd(filenamez, std::ios::binary);
+
+    for (int x = Nboudary; x < nx_abc - Nboudary; x++)
+    {
+
+        file_PVxOF_fwd.write(reinterpret_cast<const char *>(&ux_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
+
+        file_PVzOF_fwd.write(reinterpret_cast<const char *>(&uz_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
+    }
+
+    file_PVxOF_fwd.close();
+    file_PVzOF_fwd.close();
+
+}
+
+void saveWavefieldAndOpticalFlowSnapshots(const std::string &filename_wavefield, const std::string &filename_ux, const std::string &filename_uz, int nx_abc, int nz_abc, int Nboudary, const float *wavefield, const float *ux, const float *uz)
+{
+    std::ofstream file_wavefield(filename_wavefield, std::ios::binary);
+    std::ofstream file_ux(filename_ux, std::ios::binary);
+    std::ofstream file_uz(filename_uz, std::ios::binary);
+
+    for (int x = Nboudary; x < nx_abc - Nboudary; x++)
+    {
+        const int row_size = (nz_abc - 2 * Nboudary) * sizeof(float);
+
+        file_wavefield.write(reinterpret_cast<const char *>(&wavefield[x * nz_abc + Nboudary]), row_size);
+        file_ux.write(reinterpret_cast<const char *>(&ux[x * nz_abc + Nboudary]), row_size);
+        file_uz.write(reinterpret_cast<const char *>(&uz[x * nz_abc + Nboudary]), row_size);
+    }
+}
+
 //----------------------------------
 // linscpace function
 //----------------------------------
@@ -629,26 +762,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i - 1)] - u_curr[j * nz_abc + (i - 2)]) / (12 * dz * dz);
 
                     u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
-
-                    //----------------------------------
-                    // Poynting vectors + Optical Flow
-                    //----------------------------------
-
-                    if (n % 10 == 0)
-                    {
-                        float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i]) / dt;
-                        float Ux = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i]) / (12 * dx);
-                        float Uz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)]) / (12 * dz);
-
-                        //--------------------------------------
-                        // saves the derivatives to Optical Flow
-                        //--------------------------------------
-
-                        px_fwd[j * nz_abc + i] = Ux;
-                        pz_fwd[j * nz_abc + i] = Uz;
-                        pt_fwd[j * nz_abc + i] = dUdt;
-                    }
-
                 }
             }
 
@@ -719,47 +832,37 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
+            //--------------------------------------------------
+            // Saving the derivatives to Optical Flow - FWD
+            //--------------------------------------------------
+
+            if(n == 1){
+                std::cout << "Saving the derivatives to Optical Flow of the forward!" << std::endl;
+            }
+
+            if (n % 10 == 0)
+            {
+                calculateWavefieldDerivatives(u_curr, u_next, px_fwd, pz_fwd, pt_fwd, dt, dx, dz, nx_abc, nz_abc);
+            }
+
             //---------------------------------------------------------------
             // Using Optical Flow method (20 iterations over the entire mesh)
             //---------------------------------------------------------------
 
+            int n_iter = 20;
+            float alpha = 1.0f;
+
+            if(n == 1)
+            {
+                std::cout << "Calculating the Optical Flow of the forward!" << std::endl;
+            }
+
             if (n % 10 == 0)
             {
-
                 std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
                 std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
 
-                int n_iter = 20;
-                float alpha = 1.0f;
-
-                for (int iter = 0; iter < n_iter; iter++)
-                {
-                    for (int j = 2; j < nx_abc - 2; j++)
-                    {
-                        for (int i = 2; i < nz_abc - 2; i++)
-                        {
-                            float somaux_fwd = 0.0f;
-                            float somauz_fwd = 0.0f;
-
-                            for (int a = -1; a <= 1; a++)
-                            {
-                                for (int b = -1; b <= 1; b++)
-                                {
-                                    somaux_fwd += ux_fwd[(j + a) * nz_abc + (i + b)];
-                                    somauz_fwd += uz_fwd[(j + a) * nz_abc + (i + b)];
-                                }
-                            }
-
-                            float ux_fwd_average = (1.0f / 12.0f) * (ux_fwd[j * nz_abc + i - nz_abc] + ux_fwd[j * nz_abc + i + nz_abc] + ux_fwd[j * nz_abc + i - 1] + ux_fwd[j * nz_abc + i + 1] - ux_fwd[j * nz_abc + i] + somaux_fwd);
-                            float uz_fwd_average = (1.0f / 12.0f) * (uz_fwd[j * nz_abc + i - nz_abc] + uz_fwd[j * nz_abc + i + nz_abc] + uz_fwd[j * nz_abc + i - 1] + uz_fwd[j * nz_abc + i + 1] - uz_fwd[j * nz_abc + i] + somauz_fwd);
-
-                            float denominator_fwd = alpha * alpha + px_fwd[j * nz_abc + i] * px_fwd[j * nz_abc + i] + pz_fwd[j * nz_abc + i] * pz_fwd[j * nz_abc + i];
-
-                            ux_fwd[j * nz_abc + i] = ux_fwd_average - (px_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
-                            uz_fwd[j * nz_abc + i] = uz_fwd_average - (pz_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
-                        }
-                    }
-                }
+                opticalFlow(ux_fwd, uz_fwd, px_fwd, pz_fwd, pt_fwd, nx_abc, nz_abc, alpha, n_iter);
             }
 
             //-------------------------------------------------------
@@ -773,20 +876,11 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             if (n % 10 == 0)
             {
+                std::string filenamex = "../outputs/PV+OF_fwd_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
+                std::string filenamez = "../outputs/PV+OF_fwd_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
 
-                std::ofstream file_PVxOF_fwd("../outputs/PV+OF_fwd_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-                std::ofstream file_PVzOF_fwd("../outputs/PV+OF_fwd_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                saveSnapshots(filenamex, filenamez, nx_abc, nz_abc, Nboudary, n, shot, ux_fwd, uz_fwd);
 
-                for (int x = Nboudary; x < nx_abc - Nboudary; x++)
-                {
-
-                    file_PVxOF_fwd.write(reinterpret_cast<char *>(&ux_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
-
-                    file_PVzOF_fwd.write(reinterpret_cast<char *>(&uz_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
-                }
-
-                file_PVxOF_fwd.close();
-                file_PVzOF_fwd.close();
             }
 
             //----------------------------------
@@ -817,25 +911,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     float d2z = (-u_back_curr[j * nz_abc + (i + 2)] + 16 * u_back_curr[j * nz_abc + (i + 1)] - 30 * u_back_curr[j * nz_abc + i] + 16 * u_back_curr[j * nz_abc + (i - 1)] - u_back_curr[j * nz_abc + (i - 2)]) / (12 * dz * dz);
 
                     u_back_next[j * nz_abc + i] = 2 * u_back_curr[j * nz_abc + i] - u_back_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
-
-                    //----------------------------------
-                    // Poynting vectors + Optical Flow
-                    //----------------------------------
-
-                    if (n % 10 == 0)
-                    {
-                        float dUdt = (u_back_next[j * nz_abc + i] - u_back_curr[j * nz_abc + i]) / dt;
-                        float Ux = (u_back_curr[(j - 2) * nz_abc + i] - 8 * u_back_curr[(j - 1) * nz_abc + i] + 8 * u_back_curr[(j + 1) * nz_abc + i] - u_back_curr[(j + 2) * nz_abc + i]) / (12 * dx);
-                        float Uz = (u_back_curr[j * nz_abc + (i - 2)] - 8 * u_back_curr[j * nz_abc + (i - 1)] + 8 * u_back_curr[j * nz_abc + (i + 1)] - u_back_curr[j * nz_abc + (i + 2)]) / (12 * dz);
-
-                        //--------------------------------------
-                        // saves the derivatives to Optical Flow
-                        //--------------------------------------
-
-                        px_back[j * nz_abc + i] = Ux;
-                        pz_back[j * nz_abc + i] = Uz;
-                        pt_back[j * nz_abc + i] = dUdt;
-                    }
 
                 }
             }
@@ -913,6 +988,20 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
+            //--------------------------------------------------
+            // Saving the derivatives to Optical Flow - BACK
+            //--------------------------------------------------
+
+            if(n == 1)
+            {
+                std::cout << "Saving the derivatives to Optical Flow of the backward!" << std::endl;
+            }
+            
+            if (n % 10 == 0)
+            {
+                calculateWavefieldDerivatives(u_back_curr, u_back_next, px_back, pz_back, pt_back, dt, dx, dz, nx_abc, nz_abc);
+            }
+
             //---------------------------------------------------------------
             // Using Optical Flow method (20 iterations over the entire mesh)
             //---------------------------------------------------------------
@@ -926,34 +1015,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 int n_iter = 20;
                 float alpha = 1.0f;
 
-                for (int iter = 0; iter < n_iter; iter++)
-                {
-                    for (int j = 2; j < nx_abc - 2; j++)
-                    {
-                        for (int i = 2; i < nz_abc - 2; i++)
-                        {
-                            float somaux_back = 0.0f;
-                            float somauz_back = 0.0f;
-
-                            for (int a = -1; a <= 1; a++)
-                            {
-                                for (int b = -1; b <= 1; b++)
-                                {
-                                    somaux_back += ux_back[(j + a) * nz_abc + (i + b)];
-                                    somauz_back += uz_back[(j + a) * nz_abc + (i + b)];
-                                }
-                            }
-
-                            float ux_back_average = (1.0f / 12.0f) * (ux_back[j * nz_abc + i - nz_abc] + ux_back[j * nz_abc + i + nz_abc] + ux_back[j * nz_abc + i - 1] + ux_back[j * nz_abc + i + 1] - ux_back[j * nz_abc + i] + somaux_back);
-                            float uz_back_average = (1.0f / 12.0f) * (uz_back[j * nz_abc + i - nz_abc] + uz_back[j * nz_abc + i + nz_abc] + uz_back[j * nz_abc + i - 1] + uz_back[j * nz_abc + i + 1] - uz_back[j * nz_abc + i] + somauz_back);
-
-                            float denominator_back = alpha * alpha + px_back[j * nz_abc + i] * px_back[j * nz_abc + i] + pz_back[j * nz_abc + i] * pz_back[j * nz_abc + i];
-
-                            ux_back[j * nz_abc + i] = ux_back_average - (px_back[j * nz_abc + i] * (px_back[j * nz_abc + i] * ux_back_average + pz_back[j * nz_abc + i] * uz_back_average + pt_back[j * nz_abc + i]) / denominator_back);
-                            uz_back[j * nz_abc + i] = uz_back_average - (pz_back[j * nz_abc + i] * (px_back[j * nz_abc + i] * ux_back_average + pz_back[j * nz_abc + i] * uz_back_average + pt_back[j * nz_abc + i]) / denominator_back);
-                        }
-                    }
-                }
+                opticalFlow(ux_back, uz_back, px_back, pz_back, pt_back, nx_abc, nz_abc, alpha, n_iter);
             }
 
             //-------------------------------------------------------
@@ -967,25 +1029,11 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             if (n % 10 == 0)
             {
+                std::string filename_snapshot = "../outputs/snapshot_back_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
+                std::string filename_pv_of_x = "../outputs/PV+OF_back_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
+                std::string filename_pv_of_z = "../outputs/PV+OF_back_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
 
-                std::ofstream file_back("../outputs/snapshot_back_" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-
-                std::ofstream file_PVxOF_back("../outputs/PV+OF_back_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-                std::ofstream file_PVzOF_back("../outputs/PV+OF_back_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
-
-                for (int x = Nboudary; x < nx_abc - Nboudary; x++)
-                {
-
-                    file_back.write(reinterpret_cast<char *>(&u_back_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves snaps without the absorbent border
-
-                    file_PVxOF_back.write(reinterpret_cast<char *>(&ux_back[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
-
-                    file_PVzOF_back.write(reinterpret_cast<char *>(&uz_back[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float)); // saves PV values
-                }
-
-                file_back.close();
-                file_PVxOF_back.close();
-                file_PVzOF_back.close();
+                saveWavefieldAndOpticalFlowSnapshots(filename_snapshot, filename_pv_of_x, filename_pv_of_z, nx_abc, nz_abc, Nboudary, u_back_next, ux_back, uz_back);
             }
 
             //----------------------------------
@@ -996,7 +1044,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             if (fwd_index != 0 && fwd_index % 10 == 0) // At t=0, the forward field is zero by definition.
             {
-                std::ifstream fwd_file("../outputs/snapshot_fwd_" + std::to_string(fwd_index) + "_shot " + std::to_string(shot) + ".bin", std::ios::binary);
+                std::ifstream fwd_file("../outputs/snapshot_fwd_" + std::to_string(fwd_index) + "_shot_" + std::to_string(shot) + ".bin", std::ios::binary);
 
                 if (!fwd_file.is_open()) // check when opening file
                 {
@@ -1274,7 +1322,7 @@ int main()
 
     std::cout << "Reading the document of the velocity model!" << std::endl;
 
-    float *c = readVelocity(velocity_file, nx, nz, nx_abc, nz_abc, Nboudary);
+    float *c = readVelocity("../inputs/velocityModel.bin", nx, nz, nx_abc, nz_abc, Nboudary);
 
     //------------------------------------------
     // open the document of the SOURCE

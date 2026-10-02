@@ -68,6 +68,7 @@ void saveSeismogram(const float *seismogram_shot, std::string filename, int nt, 
     }
 
     file.write(reinterpret_cast<const char*>(seismogram_shot), nt * sizeof(float));
+    
     file.close();
 
 }

@@ -552,7 +552,7 @@ fig, ax = plt.subplots(figsize=(12, 4))
 
 im = ax.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], cmap="viridis", aspect="auto")
 
-linhas ligando cada par fonte-receptor, pra visualizar o offset/midpoint do CMP
+#linhas ligando cada par fonte-receptor, pra visualizar o offset/midpoint do CMP
 for i in range(len(src_x)):
     ax.plot([src_x[i], rec_x[i]], [src_z[i], rec_z[i]], color="white", linewidth=0.5, alpha=0.5, zorder=4)
 

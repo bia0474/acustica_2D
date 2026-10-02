@@ -120,10 +120,10 @@ int main(){
 // Save the velocity model as binary (.bin)
 //------------------------------------------
 
-    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModel.bin", "wb"); // "wb" = write binary
+    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModel2.bin", "wb"); // "wb" = write binary
 
     if(file_velocities == NULL){
-        printf("Erro ao abrir velocityModel.bin\n");
+        printf("Erro ao abrir velocityModel2.bin\n");
         return 1;
     }
 
