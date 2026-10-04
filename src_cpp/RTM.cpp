@@ -5,7 +5,6 @@
 #include <string>
 #include <algorithm>
 #include <stdlib.h>
-#include <omp.h>
 
 //-------------------------------
 // Struct of the receivers
@@ -42,9 +41,11 @@ void opticalFlow(float *ux, float *uz, const float *px, const float *pz, const f
     float *ux_next = ux_temp;
     float *uz_next = uz_temp;
 
+    const int N = nx_abc * nz_abc;
+#pragma acc data copyin(px[0:N], pz[0:N], pt[0:N]) copy(ux[0:N], uz[0:N], ux_temp[0:N], uz_temp[0:N])
     for (int iter = 0; iter < n_iter; iter++)
     {
-        #pragma omp parallel for collapse(2) schedule(static)
+#pragma acc parallel loop collapse(2)
         for (int j = 2; j < nx_abc - 2; j++)
         {
             for (int i = 2; i < nz_abc - 2; i++)
@@ -99,7 +100,10 @@ void opticalFlow(float *ux, float *uz, const float *px, const float *pz, const f
 
 void calculateWavefieldDerivatives(const float *u_curr, const float *u_next, float *px, float *pz, float *pt, float dt, float dx, float dz, int nx_abc, int nz_abc)
 {
-    #pragma omp parallel for collapse(2) schedule(static)
+    const int N = nx_abc * nz_abc;
+#pragma acc data copyin(u_curr[0:N], u_next[0:N]) copy(px[0:N], pz[0:N], pt[0:N])
+{
+#pragma acc parallel loop collapse(2)
     for (int j = 2; j < nx_abc - 2; j++)
     { // traverses all points of the grid in X
 
@@ -110,6 +114,7 @@ void calculateWavefieldDerivatives(const float *u_curr, const float *u_next, flo
             pz[j * nz_abc + i] = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)]) / (12 * dz);
         }
     }
+}
 }
 
 //-------------------------------------------------------
@@ -591,7 +596,7 @@ float *createCerjanVector(int Nboudary)
         return NULL; // null means it's not pointing anywhere
     }
 
-#pragma omp parallel for
+#pragma acc parallel loop copyout(A[0:Nboudary])
     for (int i = 0; i < Nboudary; i++)
     {
         float fb = (float)(Nboudary - i) / (1.4142f * Sb); // for each position of the absorbent layer, a normalized distance is calculated
@@ -613,7 +618,7 @@ float *source(float f0, const float *t, int nt)
 
     float t0 = 1.0 / f0; // wavelet time delay
 
-#pragma omp parallel for
+#pragma acc parallel loop copyin(t[0:nt]) copyout(s[0:nt])
     for (int n = 0; n < nt; n++)
     {
 
@@ -669,6 +674,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     }
 
     int Nshots = Nsource;
+    const int N = nx_abc * nz_abc;
+    const int image_size = nx * nz;
 
     float *seismogram_shot = (float*) malloc(nt * sizeof(float));
 
@@ -695,6 +702,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     //-----------------------------------
 
     std::cout << "Starting the temporal and spacial loops of the forward!" << std::endl;
+
+#pragma acc data copyin(c[0:N], A[0:Nboudary], fonte[0:nt]) copy(u_curr[0:N], u_next[0:N], u_back_curr[0:N], u_back_next[0:N], px_fwd[0:N], pz_fwd[0:N], pt_fwd[0:N], ux_fwd[0:N], uz_fwd[0:N], px_back[0:N], pz_back[0:N], pt_back[0:N], ux_back[0:N], uz_back[0:N], image[0:image_size], u_fwd_n[0:image_size])
 
     for (int shot = 0; shot < Nshots; shot++)
     {
@@ -746,7 +755,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             // space loop - 4nd order
             //----------------------------------
 
-    #pragma omp parallel for collapse(2) schedule(static)
+#pragma acc parallel loop collapse(2)
             for (int j = 2; j < nx_abc - 2; j++)
             { // traverses all points of the grid in X
 
@@ -780,52 +789,44 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 std::cout << "Making the CERJAN boudary of the forward" << std::endl;
             }
 
-    #pragma omp parallel for collapse(2)
+#pragma acc parallel loop collapse(2)
             for (int x = 0; x < Nboudary; x++)
             { // Left
-
                 for (int z = 0; z < nz_abc; z++)
                 {
-
                     u_next[x * nz_abc + z] *= A[x];
                     u_curr[x * nz_abc + z] *= A[x];
                 }
             }
 
-    #pragma omp parallel for
+#pragma acc parallel loop collapse(2)
             for (int x = nx_abc - Nboudary; x < nx_abc; x++)
             { // right
-
-                int k = nx_abc - 1 - x;
-
                 for (int z = 0; z < nz_abc; z++)
                 {
+                    const int k = nx_abc - 1 - x;
 
                     u_next[x * nz_abc + z] *= A[k];
                     u_curr[x * nz_abc + z] *= A[k];
                 }
             }
 
-    #pragma omp parallel for collapse(2)
+#pragma acc parallel loop collapse(2)
             for (int z = 0; z < Nboudary; z++)
             { // Top
-
                 for (int x = 0; x < nx_abc; x++)
                 {
-
                     u_next[x * nz_abc + z] *= A[z];
                     u_curr[x * nz_abc + z] *= A[z];
                 }
             }
 
-    #pragma omp parallel for
+#pragma acc parallel loop collapse(2)
             for (int z = nz_abc - Nboudary; z < nz_abc; z++)
             {
-
-                int k = nz_abc - 1 - z;
-
                 for (int x = 0; x < nx_abc; x++)
                 { // Base
+                    const int k = nz_abc - 1 - z;
 
                     u_next[x * nz_abc + z] *= A[k];
                     u_curr[x * nz_abc + z] *= A[k];
@@ -901,7 +902,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             // space loop - 4th order
             //----------------------------------
 
-    #pragma omp parallel for collapse(2) schedule(static)
+#pragma acc parallel loop collapse(2)
             for (int j = 2; j < nx_abc - 2; j++)
             {
                 for (int i = 2; i < nz_abc - 2; i++)
@@ -936,52 +937,45 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 std::cout << "Making the CERJAN boudary of the backward" << std::endl;
             }
 
-    #pragma omp parallel for collapse(2)
+#pragma acc parallel loop collapse(2)
             for (int x = 0; x < Nboudary; x++)
             { // Left
-
                 for (int z = 0; z < nz_abc; z++)
                 {
-
                     u_back_next[x * nz_abc + z] *= A[x];
                     u_back_curr[x * nz_abc + z] *= A[x];
                 }
             }
 
-    #pragma omp parallel for
+#pragma acc parallel loop collapse(2)
             for (int x = nx_abc - Nboudary; x < nx_abc; x++)
             { // right
-
-                int k = nx_abc - 1 - x;
-
                 for (int z = 0; z < nz_abc; z++)
                 {
+                    const int k = nx_abc - 1 - x;
 
                     u_back_next[x * nz_abc + z] *= A[k];
                     u_back_curr[x * nz_abc + z] *= A[k];
                 }
             }
 
-    #pragma omp parallel for collapse(2)
+#pragma acc parallel loop collapse(2)
             for (int z = 0; z < Nboudary; z++)
             { // Top
-
                 for (int x = 0; x < nx_abc; x++)
                 {
-
                     u_back_next[x * nz_abc + z] *= A[z];
                     u_back_curr[x * nz_abc + z] *= A[z];
                 }
             }
 
-    #pragma omp parallel for
+#pragma acc parallel loop collapse(2)
             for (int z = nz_abc - Nboudary; z < nz_abc; z++)
             {
-
-                int k = nz_abc - 1 - z;
-
                 for (int x = 0; x < nx_abc; x++)
                 { // Base
+
+                    const int k = nz_abc - 1 - z;
 
                     u_back_next[x * nz_abc + z] *= A[k];
                     u_back_curr[x * nz_abc + z] *= A[k];
@@ -1060,7 +1054,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                 fwd_file.close();
 
-    #pragma omp parallel for collapse(2)
+#pragma acc parallel loop collapse(2)
                 for (int x = 0; x < nx; x++)
                 {
                     for (int z = 0; z < nz; z++)
@@ -1274,9 +1268,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 int main()
 {
 
-    omp_set_dynamic(0); // Disable dynamic adjustment of the number of threads
-    omp_set_num_threads(omp_get_max_threads()); // Set the number of threads to the maximum available
-
     //----------------------------------
     // open the document of PARAMETERS
     //----------------------------------
@@ -1322,7 +1313,7 @@ int main()
 
     std::cout << "Reading the document of the velocity model!" << std::endl;
 
-    float *c = readVelocity("../inputs/velocityModel.bin", nx, nz, nx_abc, nz_abc, Nboudary);
+    float *c = readVelocity("../inputs/velocityModel2.bin", nx, nz, nx_abc, nz_abc, Nboudary);
 
     //------------------------------------------
     // open the document of the SOURCE

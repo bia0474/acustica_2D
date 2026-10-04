@@ -14,8 +14,8 @@ nvc++ onda_acustica_2D_4_ordem.cpp $FLAGS -acc=multicore -Minfo=accel -o runAcus
 
 time ./runAcustica2D
 
-#g++ RTM.cpp $FLAGS -fopenmp -o rtm || exit 1
+nvc++ RTM.cpp $FLAGS -acc=multicore -Minfo=accel -o rtm || exit 1
 
-#time ./rtm
+time ./rtm
 
 python3 -i onda_acustica_2D.py

@@ -548,7 +548,6 @@ float *createCerjanVector(int Nboudary)
 #pragma acc parallel loop copyout(A[0:Nboudary])
     for (int i = 0; i < Nboudary; i++)
     {
-
         float fb = (float)(Nboudary - i) / (1.4142f * Sb); // for each position of the absorbent layer, a normalized distance is calculated
 
         A[i] = std::exp(-fb * fb); // the coefficients follow a Gaussian curve, where a smooth transition occurs
@@ -615,7 +614,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     const int N = nx_abc * nz_abc;
 
-#pragma acc data copyin(c[0:N], A[0:Nboudary], fonte[0:nt]) \ copy(u_curr[0:N], u_next[0:N])
+#pragma acc data copyin(c[0:N], A[0:Nboudary], fonte[0:nt]) copy(u_curr[0:N], u_next[0:N])
     for (int shot = 0; shot < Nshots; shot++)
     {
         std::cout << "Tiro " << shot << "\n";
