@@ -42,10 +42,17 @@ void opticalFlow(float *ux, float *uz, const float *px, const float *pz, const f
     float *uz_next = uz_temp;
 
     const int N = nx_abc * nz_abc;
-#pragma acc data copyin(px[0:N], pz[0:N], pt[0:N]) copy(ux[0:N], uz[0:N], ux_temp[0:N], uz_temp[0:N])
+
+#pragma acc data copyin(px[0:N], pz[0:N], pt[0:N]) \
+                 copy(ux[0:N], uz[0:N], \
+                      ux_temp[0:N], uz_temp[0:N])
+
     for (int iter = 0; iter < n_iter; iter++)
     {
-#pragma acc parallel loop collapse(2)
+#pragma acc parallel loop collapse(2) \
+    present(ux_current[0:N], uz_current[0:N], \
+            ux_next[0:N], uz_next[0:N])
+            
         for (int j = 2; j < nx_abc - 2; j++)
         {
             for (int i = 2; i < nz_abc - 2; i++)

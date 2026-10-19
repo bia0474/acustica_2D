@@ -5,7 +5,6 @@
 #include <string>
 #include <algorithm>
 #include <stdlib.h>
-#include <omp.h>
 #include <time.h>
 
 //----------------------------------
@@ -335,7 +334,6 @@ bool CFL(const float* c, float dt, float dx, int nx, int nz){ //function of the 
 
     float cmax = 0.0f;
 
-
     for(int i = 0; i < nx; i++){
 
         for(int j = 0; j < nz; j++){
@@ -392,7 +390,7 @@ float *createCerjanVector(int Nboudary)
         return NULL; // null means it's not pointing anywhere
     }
 
-#pragma omp parallel for
+#pragma acc parallel loop copyout(A[0:Nboudary])
     for (int i = 0; i < Nboudary; i++)
     {
 
@@ -410,12 +408,11 @@ float *createCerjanVector(int Nboudary)
 
 float *source(float f0, const float *t, int nt)
 {
-
     float *s = (float *)malloc(nt * sizeof(float));
 
     float t0 = 1.0 / f0; // wavelet time delay
 
-#pragma omp parallel for
+#pragma acc parallel loop copyin(t[0:nt]) copyout(s[0:nt])
     for (int n = 0; n < nt; n++)
     {
 
@@ -433,7 +430,6 @@ float *source(float f0, const float *t, int nt)
 
 float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int nx, int nz, int nx_abc, int nz_abc, int nt, const float *A, int Nboudary, int *sx, int *sz, int Nsource)
 {
-
     float *u_curr = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // present field of the fwd
     float *u_next = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // future field of the fwd
 
@@ -450,6 +446,10 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     float *ux_fwd = (float *)calloc(nx_abc * nz_abc, sizeof(float));
     float *uz_fwd = (float *)calloc(nx_abc * nz_abc, sizeof(float));
+    float *ux_temp = (float *)calloc(nx_abc * nz_abc, sizeof(float));
+    float *uz_temp = (float *)calloc(nx_abc * nz_abc, sizeof(float));
+
+    const int N = nx_abc * nz_abc;
 
     //-----------------------------------
     // FORWARD FIELD
@@ -459,217 +459,237 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     std::cout << "Simulacao com " << Nsource << " fontes simultaneas\n";
 
+    #pragma acc data copyin(c[0:N], A[0:Nboudary], fonte[0:nt], sx[0:Nsource], sz[0:Nsource]) \
+                     copy(u_curr[0:N], u_next[0:N]) \
+                     create(px_fwd[0:N], pz_fwd[0:N], pt_fwd[0:N], PVx[0:N], PVz[0:N], \
+                            ux_fwd[0:N], uz_fwd[0:N], ux_temp[0:N], uz_temp[0:N])
+    {
     for (int n = 1; n < nt; n++)
-        { // each iteration calculates the wave at the next instant
+    { // each iteration calculates the wave at the next instant
+        //----------------------------------
+        // space loop - 4nd order
+        //----------------------------------
 
-            //----------------------------------
-            // space loop - 4nd order
-            //----------------------------------
+        #pragma acc parallel loop collapse(2) present(u_curr[0:N], u_next[0:N], c[0:N])
+        for (int j = 2; j < nx_abc - 2; j++)
+        { // traverses all points of the grid in X
+            for (int i = 2; i < nz_abc - 2; i++)
+            { // traverses all points of the grid in Z
 
-            #pragma omp parallel for collapse(2) schedule(static)
+                //----------------------------------
+                // finite differences
+                //----------------------------------
+
+                float d2x = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] - u_curr[(j - 2) * nz_abc + i]) / (12 * dx * dx);
+
+                float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i - 1)] - u_curr[j * nz_abc + (i - 2)]) / (12 * dz * dz);
+
+                u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
+                    
+            }
+        }
+
+        //----------------------------------
+        // injeta todas as fontes no mesmo instante
+        //----------------------------------
+
+        #pragma acc parallel loop present(u_next[0:N], sx[0:Nsource], sz[0:Nsource], fonte[0:nt])
+        for (int source = 0; source < Nsource; source++)
+        {
+            #pragma acc atomic update
+            u_next[sx[source] * nz_abc + sz[source]] += (fonte[n]) / (dx * dz);
+        }
+
+        //-----------------------------------
+        // CERJAN
+        //-----------------------------------
+
+        if (n == 1)
+        {
+            std::cout << "Making the CERJAN boudary of the forward" << std::endl;
+        }
+
+        #pragma acc parallel loop collapse(2) present(u_next[0:N], u_curr[0:N], A[0:Nboudary])
+        for (int x = 0; x < Nboudary; x++)
+        { // Left
+            for (int z = 0; z < nz_abc; z++)
+            {
+                u_next[x * nz_abc + z] *= A[x];
+                u_curr[x * nz_abc + z] *= A[x];
+            }
+        }
+
+        #pragma acc parallel loop collapse(2) present(u_next[0:N], u_curr[0:N], A[0:Nboudary])
+        for (int x = nx_abc - Nboudary; x < nx_abc; x++)
+        { // right
+            for (int z = 0; z < nz_abc; z++)
+            {
+                int k = nx_abc - 1 - x;
+                u_next[x * nz_abc + z] *= A[k];
+                u_curr[x * nz_abc + z] *= A[k];
+            }
+        }
+
+        #pragma acc parallel loop collapse(2) present(u_next[0:N], u_curr[0:N], A[0:Nboudary])
+        for (int z = 0; z < Nboudary; z++)
+        { // Top
+
+            for (int x = 0; x < nx_abc; x++)
+            {
+                u_next[x * nz_abc + z] *= A[z];
+                u_curr[x * nz_abc + z] *= A[z];
+            }
+        }
+
+        #pragma acc parallel loop collapse(2) present(u_next[0:N], u_curr[0:N], A[0:Nboudary])
+        for (int z = nz_abc - Nboudary; z < nz_abc; z++)
+        {
+            for (int x = 0; x < nx_abc; x++)
+            { // Base
+                int k = nz_abc - 1 - z;
+                u_next[x * nz_abc + z] *= A[k];
+                u_curr[x * nz_abc + z] *= A[k];
+            }
+        }
+
+        //----------------------------------
+        // Poynting vectors + Optical Flow
+        //----------------------------------
+            
+        if(n % 100 == 0)
+        {
+            #pragma acc parallel loop collapse(2) present(u_curr[0:N], u_next[0:N], PVx[0:N], PVz[0:N], px_fwd[0:N], pz_fwd[0:N], pt_fwd[0:N])
             for (int j = 2; j < nx_abc - 2; j++)
             { // traverses all points of the grid in X
 
                 for (int i = 2; i < nz_abc - 2; i++)
                 { // traverses all points of the grid in Z
 
-                    //----------------------------------
-                    // finite differences
-                    //----------------------------------
+                    float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i]) / dt;
+                    float Ux = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i]) / (12 * dx);
+                    float Uz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)]) / (12 * dz);
 
-                    float d2x = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] - u_curr[(j - 2) * nz_abc + i]) / (12 * dx * dx);
+                    PVx[j * nz_abc + i] = -dUdt * Ux;
+                    PVz[j * nz_abc + i] = -dUdt * Uz;
 
-                    float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i - 1)] - u_curr[j * nz_abc + (i - 2)]) / (12 * dz * dz);
+                    //--------------------------------------
+                    // saves the derivatives to Optical Flow
+                    //--------------------------------------
 
-                    u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
-                    
+                    px_fwd[j * nz_abc + i] = Ux;
+                    pz_fwd[j * nz_abc + i] = Uz;
+                    pt_fwd[j * nz_abc + i] = dUdt;
                 }
             }
+        }
 
-            //----------------------------------
-            // injeta todas as fontes no mesmo instante
-            //----------------------------------
+        //---------------------------------------------------------------
+        // Using Optical Flow method (20 iterations over the entire mesh)
+        //---------------------------------------------------------------
 
-            for (int source = 0; source < Nsource; source++)
+        if (n % 100 == 0)
+        {
+            #pragma acc parallel loop present(ux_fwd[0:N], uz_fwd[0:N], ux_temp[0:N], uz_temp[0:N])
+            for (int i = 0; i < N; i++)
             {
-                u_next[sx[source] * nz_abc + sz[source]] += (fonte[n]) / (dx * dz);
+                ux_fwd[i] = 0.0f;
+                uz_fwd[i] = 0.0f;
+                ux_temp[i] = 0.0f;
+                uz_temp[i] = 0.0f;
             }
 
-            //-----------------------------------
-            // CERJAN 
-            //-----------------------------------
+            int n_iter = 20;
+            float alpha = 1.0f;
+            float *ux_current = ux_fwd;
+            float *uz_current = uz_fwd;
+            float *ux_next = ux_temp;
+            float *uz_next = uz_temp;
 
-            if (n == 1)
+            for (int iter = 0; iter < n_iter; iter++)
             {
-                std::cout << "Making the CERJAN boudary of the forward" << std::endl;
-            }
-
-            #pragma omp parallel for collapse(2)
-            for (int x = 0; x < Nboudary; x++)
-            { // Left
-
-                for (int z = 0; z < nz_abc; z++)
-                {
-
-                    u_next[x * nz_abc + z] *= A[x];
-                    u_curr[x * nz_abc + z] *= A[x];
-                }
-            }
-
-            for (int x = nx_abc - Nboudary; x < nx_abc; x++)
-            { // right
-
-                int k = nx_abc - 1 - x;
-
-                for (int z = 0; z < nz_abc; z++)
-                {
-
-                    u_next[x * nz_abc + z] *= A[k];
-                    u_curr[x * nz_abc + z] *= A[k];
-                }
-            }
-
-            #pragma omp parallel for collapse(2)
-            for (int z = 0; z < Nboudary; z++)
-            { // Top
-
-                for (int x = 0; x < nx_abc; x++)
-                {
-
-                    u_next[x * nz_abc + z] *= A[z];
-                    u_curr[x * nz_abc + z] *= A[z];
-                }
-            }
-
-            for (int z = nz_abc - Nboudary; z < nz_abc; z++)
-            {
-
-                int k = nz_abc - 1 - z;
-
-                for (int x = 0; x < nx_abc; x++)
-                { // Base
-
-                    u_next[x * nz_abc + z] *= A[k];
-                    u_curr[x * nz_abc + z] *= A[k];
-                }
-            }
-
-            //----------------------------------
-            // Poynting vectors + Optical Flow
-            //----------------------------------
-            
-            if(n % 100 == 0)
-            {
-
-                #pragma omp parallel for collapse(2) schedule(static)
+                #pragma acc parallel loop collapse(2) present(ux_current[0:N], uz_current[0:N], ux_next[0:N], uz_next[0:N], px_fwd[0:N], pz_fwd[0:N], pt_fwd[0:N])
                 for (int j = 2; j < nx_abc - 2; j++)
-                { // traverses all points of the grid in X
-
+                {
                     for (int i = 2; i < nz_abc - 2; i++)
-                    { // traverses all points of the grid in Z
-
-                        float dUdt = (u_next[j * nz_abc + i] - u_curr[j * nz_abc + i]) / dt;
-                        float Ux = (u_curr[(j - 2) * nz_abc + i] - 8 * u_curr[(j - 1) * nz_abc + i] + 8 * u_curr[(j + 1) * nz_abc + i] - u_curr[(j + 2) * nz_abc + i]) / (12 * dx);
-                        float Uz = (u_curr[j * nz_abc + (i - 2)] - 8 * u_curr[j * nz_abc + (i - 1)] + 8 * u_curr[j * nz_abc + (i + 1)] - u_curr[j * nz_abc + (i + 2)]) / (12 * dz);
-
-                        PVx[j * nz_abc + i] = -dUdt * Ux;
-                        PVz[j * nz_abc + i] = -dUdt * Uz;   
-
-                        //--------------------------------------
-                        // saves the derivatives to Optical Flow
-                        //--------------------------------------
-
-                        px_fwd[j * nz_abc + i] = Ux;
-                        pz_fwd[j * nz_abc + i] = Uz;
-                        pt_fwd[j * nz_abc + i] = dUdt;
-                    }
-                }
-            }
-
-            //---------------------------------------------------------------
-            // Using Optical Flow method (20 iterations over the entire mesh)
-            //---------------------------------------------------------------
-
-            if (n % 100 == 0)
-            {
-
-                std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
-                std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
-
-                int n_iter = 20;
-                float alpha = 1.0f;
-
-                for (int iter = 0; iter < n_iter; iter++)
-                {
-                    for (int j = 2; j < nx_abc - 2; j++)
                     {
-                        for (int i = 2; i < nz_abc - 2; i++)
+                        float somaux_fwd = 0.0f;
+                        float somauz_fwd = 0.0f;
+
+                        for (int a = -1; a <= 1; a++)
                         {
-                            float somaux_fwd = 0.0f;
-                            float somauz_fwd = 0.0f;
-
-                            for (int a = -1; a <= 1; a++)
+                            for (int b = -1; b <= 1; b++)
                             {
-                                for (int b = -1; b <= 1; b++)
-                                {
-                                    somaux_fwd += ux_fwd[(j + a) * nz_abc + (i + b)];
-                                    somauz_fwd += uz_fwd[(j + a) * nz_abc + (i + b)];
-                                }
+                                somaux_fwd += ux_current[(j + a) * nz_abc + (i + b)];
+                                somauz_fwd += uz_current[(j + a) * nz_abc + (i + b)];
                             }
-
-                            float ux_fwd_average = (1.0f / 12.0f) * (ux_fwd[j * nz_abc + i - nz_abc] + ux_fwd[j * nz_abc + i + nz_abc] + ux_fwd[j * nz_abc + i - 1] + ux_fwd[j * nz_abc + i + 1] - ux_fwd[j * nz_abc + i] + somaux_fwd);
-                            float uz_fwd_average = (1.0f / 12.0f) * (uz_fwd[j * nz_abc + i - nz_abc] + uz_fwd[j * nz_abc + i + nz_abc] + uz_fwd[j * nz_abc + i - 1] + uz_fwd[j * nz_abc + i + 1] - uz_fwd[j * nz_abc + i] + somauz_fwd);
-
-                            float denominator_fwd = alpha * alpha + px_fwd[j * nz_abc + i] * px_fwd[j * nz_abc + i] + pz_fwd[j * nz_abc + i] * pz_fwd[j * nz_abc + i];
-
-                            ux_fwd[j * nz_abc + i] = ux_fwd_average - (px_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
-                            uz_fwd[j * nz_abc + i] = uz_fwd_average - (pz_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
                         }
+
+                        float ux_fwd_average = (1.0f / 12.0f) * (ux_current[j * nz_abc + i - nz_abc] + ux_current[j * nz_abc + i + nz_abc] + ux_current[j * nz_abc + i - 1] + ux_current[j * nz_abc + i + 1] - ux_current[j * nz_abc + i] + somaux_fwd);
+                        float uz_fwd_average = (1.0f / 12.0f) * (uz_current[j * nz_abc + i - nz_abc] + uz_current[j * nz_abc + i + nz_abc] + uz_current[j * nz_abc + i - 1] + uz_current[j * nz_abc + i + 1] - uz_current[j * nz_abc + i] + somauz_fwd);
+
+                        float denominator_fwd = alpha * alpha + px_fwd[j * nz_abc + i] * px_fwd[j * nz_abc + i] + pz_fwd[j * nz_abc + i] * pz_fwd[j * nz_abc + i];
+
+                        ux_next[j * nz_abc + i] = ux_fwd_average - (px_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
+                        uz_next[j * nz_abc + i] = uz_fwd_average - (pz_fwd[j * nz_abc + i] * (px_fwd[j * nz_abc + i] * ux_fwd_average + pz_fwd[j * nz_abc + i] * uz_fwd_average + pt_fwd[j * nz_abc + i]) / denominator_fwd);
                     }
                 }
+                std::swap(ux_current, ux_next);
+                std::swap(uz_current, uz_next);
             }
 
-            //-------------------------------------------------------
-            // SAVE THE POYNTING VECTOR AND OPTICAL FLOW (binary documents)
-            //-------------------------------------------------------
-
-            if (n == 1)
+            if (ux_current != ux_fwd)
             {
-                std::cout << "Saving the files of PVs and OF of the forward!" << std::endl;
-            }
-
-            if (n % 100 == 0)
-            {
-
-                std::ofstream file_PVx_fwd("../outputs/PVx_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
-                std::ofstream file_PVz_fwd("../outputs/PVz_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
-                std::ofstream file_OFx_fwd("../outputs/OFx_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
-                std::ofstream file_OFz_fwd("../outputs/OFz_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
-                std::ofstream file_snapshot_fwd("../outputs/snapshot_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
-
-                for (int x = Nboudary; x < nx_abc - Nboudary; x++)
+                #pragma acc parallel loop present(ux_current[0:N], uz_current[0:N], ux_fwd[0:N], uz_fwd[0:N])
+                for (int i = 0; i < N; i++)
                 {
-
-                    file_PVx_fwd.write(reinterpret_cast<char *>(&PVx[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
-                    file_PVz_fwd.write(reinterpret_cast<char *>(&PVz[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
-                    file_OFx_fwd.write(reinterpret_cast<char *>(&ux_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
-                    file_OFz_fwd.write(reinterpret_cast<char *>(&uz_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
-                    file_snapshot_fwd.write(reinterpret_cast<char *>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
+                    ux_fwd[i] = ux_current[i];
+                    uz_fwd[i] = uz_current[i];
                 }
-
-                file_PVx_fwd.close();
-                file_PVz_fwd.close();
-                file_OFx_fwd.close();
-                file_OFz_fwd.close();
-                file_snapshot_fwd.close();
             }
+        }
+
+        //-------------------------------------------------------
+        // SAVE THE POYNTING VECTOR AND OPTICAL FLOW (binary documents)
+        //-------------------------------------------------------
+
+        if (n == 1)
+        {
+            std::cout << "Saving the files of PVs and OF of the forward!" << std::endl;
+        }
+
+        if (n % 100 == 0)
+        {
+            #pragma acc update self(PVx[0:N], PVz[0:N], ux_fwd[0:N], uz_fwd[0:N], u_next[0:N])
+            std::ofstream file_PVx_fwd("../outputs/PVx_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
+            std::ofstream file_PVz_fwd("../outputs/PVz_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
+            std::ofstream file_OFx_fwd("../outputs/OFx_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
+            std::ofstream file_OFz_fwd("../outputs/OFz_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
+            std::ofstream file_snapshot_fwd("../outputs/snapshot_fwd_" + std::to_string(n) + "_duas_fontes.bin", std::ios::binary);
+
+            for (int x = Nboudary; x < nx_abc - Nboudary; x++)
+            {
+                file_PVx_fwd.write(reinterpret_cast<char *>(&PVx[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
+                file_PVz_fwd.write(reinterpret_cast<char *>(&PVz[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
+                file_OFx_fwd.write(reinterpret_cast<char *>(&ux_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
+                file_OFz_fwd.write(reinterpret_cast<char *>(&uz_fwd[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
+                file_snapshot_fwd.write(reinterpret_cast<char *>(&u_next[x * nz_abc + Nboudary]), (nz_abc - 2 * Nboudary) * sizeof(float));
+            }
+
+            file_PVx_fwd.close();
+            file_PVz_fwd.close();
+            file_OFx_fwd.close();
+            file_OFz_fwd.close();
+            file_snapshot_fwd.close();
+        }
             
-            //----------------------------------
-            // advance in time
-            //----------------------------------
+        //----------------------------------
+        // advance in time
+        //----------------------------------
 
-            std::swap(u_curr, u_next);
+        std::swap(u_curr, u_next);
 
+    }
+    #pragma acc update self(u_curr[0:N])
     }
 
     //-----------------------------------
@@ -680,7 +700,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     for (int i = 0; i < nx_abc * nz_abc; i++)
     {
-
         result[i] = u_curr[i];
     }
 
@@ -693,6 +712,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     free(PVz);
     free(ux_fwd);
     free(uz_fwd);
+    free(ux_temp);
+    free(uz_temp);
 
     return result;
 
@@ -740,7 +761,7 @@ int main()
 
     std::cout << "Reading the document of the velocity model!" << std::endl;
 
-    float *c = readVelocity(velocity_file, nx, nz, nx_abc, nz_abc, Nboudary);
+    float *c = readVelocity("../inputs/velocityModel.bin", nx, nz, nx_abc, nz_abc, Nboudary);
 
     //------------------------------------------
     // open the document of the SOURCE

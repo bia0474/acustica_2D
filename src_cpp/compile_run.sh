@@ -10,11 +10,11 @@ cd "$(dirname "$0")" || exit 1
 
 export ACC_NUM_CORES=$(nproc)
 
-nvc++ onda_acustica_2D_4_ordem.cpp $FLAGS -acc=multicore -Minfo=accel -o runAcustica2D || exit 1
+nvc++ onda_acustica_2D_4_ordem.cpp $FLAGS -acc=gpu -Minfo=accel -o runAcustica2D || exit 1
 
 time ./runAcustica2D
 
-nvc++ RTM.cpp $FLAGS -acc=multicore -Minfo=accel -o rtm || exit 1
+nvc++ RTM.cpp $FLAGS -acc=gpu -Minfo=accel -o rtm || exit 1
 
 time ./rtm
 

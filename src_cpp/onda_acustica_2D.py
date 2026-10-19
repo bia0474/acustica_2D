@@ -200,7 +200,7 @@ plt.show()
 # diferença angular (arccos do produto escalar normalizado)
 # ---------------------------------------------------------
 
-eps = 1e-12
+ep= 1e-12
 
 mag_pv = np.sqrt(PVx_pv**2 + PVz_pv**2)
 mag_of = np.sqrt(PVx_of**2 + PVz_of**2)
@@ -239,7 +239,7 @@ plt.show()
 
 print(f"Erro angular mediano: {np.nanmedian(angle_diff):.2f} graus")
 print(f"Erro angular médio:   {np.nanmean(angle_diff):.2f} graus")
-
+'''
 #---------------------------------------------
 # animation with Poynting vectors (Direction)
 #---------------------------------------------
@@ -302,7 +302,7 @@ def update(n):
 
 ani = FuncAnimation(fig, update, frames=range(100, 4000, 100), interval=900, blit=True)
 
-ani.save("/home/processamento/acustica_2D/outputs/poynting_direction.gif", writer=PillowWriter(fps=0.8))
+ani.save("/home/processamento/acustica_2D/src_cpp/poynting_direction.gif", writer=PillowWriter(fps=0.8))
 
 plt.colorbar(img, label="Amplitude")
 
@@ -354,11 +354,12 @@ def update2(n):
 
 ani2 = FuncAnimation(fig2, update2, frames=range(100, 4000, 100), interval=900, blit=True)
 
-ani2.save("/home/processamento/acustica_2D/outputs/poynting_of.gif", writer=PillowWriter(fps=0.8))
+ani2.save("/home/processamento/acustica_2D/src_cpp/poynting__of.gif", writer=PillowWriter(fps=0.8))
 
 plt.colorbar(img2, label="Amplitude")
 
 plt.show()
+
 
 #--------------------------------------------------
 # animation with Poynting vectors and Optical Flow side by side
@@ -422,8 +423,10 @@ ani3.save("/home/processamento/acustica_2D/outputs/poynting_vs_optical_flow.gif"
 
 plt.colorbar(img3, ax=(ax3, ax4), label="Amplitude")
 
-plt.show()
+ani3.save("/home/processamento/acustica_2D/src_cpp/poynting_of.gif", writer=PillowWriter(fps=0.8))
 
+plt.show()
+'''
 #-------------------------------------
 # animatiom 2D acustic wave - backward
 #-------------------------------------
@@ -552,11 +555,7 @@ fig, ax = plt.subplots(figsize=(12, 4))
 
 im = ax.imshow(vel.T, origin="upper", extent=[0, nx * dx, nz * dz, 0], cmap="viridis", aspect="auto")
 
-#linhas ligando cada par fonte-receptor, pra visualizar o offset/midpoint do CMP
-for i in range(len(src_x)):
-    ax.plot([src_x[i], rec_x[i]], [src_z[i], rec_z[i]], color="white", linewidth=0.5, alpha=0.5, zorder=4)
-
-ax.scatter(rec_x, rec_z, marker="v", color="green", s=40, label=f"Receivers (n={len(rec_x)})", zorder=5)
+# ax.scatter(rec_x, rec_z, marker="v", color="green", s=40, label=f"Receivers (n={len(rec_x)})", zorder=5)
 ax.scatter(src_x, src_z, marker="*", color="yellow", s=150, edgecolor="k", linewidth=0.6, label=f"Sources (n={len(src_x)})", zorder=6)
 
 ax.set_xlabel("Distância (m)")
@@ -637,7 +636,7 @@ plt.title("Seismogram - with mute")
 plt.colorbar()
 
 plt.show()
-'''
+
 #----------------------------------
 # PLOT THE MIGRATED IMAGE
 #----------------------------------
@@ -749,7 +748,7 @@ plt.tight_layout()
 
 plt.show()
 
-'''
+
 #----------------------------------
 # image of the ADCIGs - vários gathers
 #----------------------------------
@@ -944,7 +943,7 @@ ax.margins(y=0)
 
 plt.tight_layout()
 plt.show()
-'''
+
 
 #----------------------------------
 # Plot the seismic trace
@@ -1192,3 +1191,4 @@ ax.set_xlim(0, n_angle_bins * angle_step)
 
 plt.tight_layout()
 plt.show()
+'''
