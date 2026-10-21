@@ -22,10 +22,9 @@ typedef struct
 // function that performs Direct Wave Mute 
 //----------------------------------------
 
-void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver *receivers, int *sx, int *sz, float dx, float dz){
+void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver *receivers, int *sx, int *sz, float dx, float dz, float source_delay){
 
     float v_direct = 1500.0f;
-    float shift = 1.0f;
     float window   = 0.10f;
 
     float dz_rec = (receivers[shot].z - sz[shot]) * dz;
@@ -33,7 +32,7 @@ void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver
 
     float dist = std::sqrt(dz_rec * dz_rec + dx_rec * dx_rec);
 
-    float traveltime = (dist / v_direct) + shift;
+    float traveltime = source_delay + (dist / v_direct);
 
     float t1 = traveltime;
     float t2 = t1 + window;
@@ -583,7 +582,7 @@ float *source(float f0, const float *t, int nt)
 // Wave equation
 //----------------------------------
 
-float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int nx, int nz, int nx_abc, int nz_abc, int nt, const float *A, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec)
+float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int nx, int nz, int nx_abc, int nz_abc, int nt, const float *A, int Nboudary, int *sx, int *sz, int Nsource, Receiver *receivers, int nrec, float source_delay)
 {
 
     float *u_curr = (float *)calloc(nx_abc * nz_abc, sizeof(float)); // present field of the fwd
@@ -615,12 +614,18 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     const int N = nx_abc * nz_abc;
 
 #pragma acc data copyin(c[0:N], A[0:Nboudary], fonte[0:nt]) copy(u_curr[0:N], u_next[0:N])
+    {
     for (int shot = 0; shot < Nshots; shot++)
     {
         std::cout << "Tiro " << shot << "\n";
 
-        std::fill(u_curr, u_curr + nx_abc * nz_abc, 0.0f);
-        std::fill(u_next, u_next + nx_abc * nz_abc, 0.0f);
+#pragma acc parallel loop present(u_curr[0:N], u_next[0:N])
+        for (int k = 0; k < N; k++)
+        {
+            u_curr[k] = 0.0f;
+            u_next[k] = 0.0f;
+        }
+
         std::fill(seismogram_shot, seismogram_shot + nt, 0.0f);
 
         for (int n = 1; n < nt; n++)
@@ -630,7 +635,11 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             // space loop - 4nd order
             //----------------------------------
 
-            #pragma acc parallel loop collapse(2)
+            const int source_x = sx[shot];
+            const int source_z = sz[shot];
+            const float source_amplitude = fonte[n] / (dx * dz);
+
+#pragma acc parallel loop collapse(2) present(c[0:N], u_curr[0:N], u_next[0:N]) firstprivate(source_x, source_z, source_amplitude)
             for (int j = 2; j < nx_abc - 2; j++)
             { // traverses all points of the grid in X
 
@@ -644,17 +653,15 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     float d2x = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] - u_curr[(j - 2) * nz_abc + i]) / (12 * dx * dx);
 
                     float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i - 1)] - u_curr[j * nz_abc + (i - 2)]) / (12 * dz * dz);
-
                     u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
-                    
+
+                    if (j == source_x && i == source_z)
+                    {
+                        u_next[j * nz_abc + i] += source_amplitude;
+                    }
+
                 }
             }
-
-            //----------------------------------
-            // source injection (uma fonte só)
-            //----------------------------------
-
-            u_next[sx[shot] * nz_abc + sz[shot]] += (fonte[n]) / (dx * dz);
 
             //-----------------------------------
             // CERJAN 
@@ -717,8 +724,10 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             int xr = receivers[shot].x;
             int zr = receivers[shot].z;
+            const int receiver_index = xr * nz_abc + zr;
 
-            seismogram_shot[n] = u_next[xr * nz_abc + zr];
+#pragma acc update self(u_next[receiver_index:1])
+            seismogram_shot[n] = u_next[receiver_index];
             
             //-------------------------------------------------------
             // save the snapshots of the forward field (binary document)
@@ -731,6 +740,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
             if (n % 10 == 0)
             {
+                // Snapshots are written by the host.
+#pragma acc update self(u_next[0:N])
                 std::string filename = "../outputs/snapshot_fwd_" + std::to_string(n) + "_shot_" + std::to_string(shot) + ".bin";
                 
                 saveSnapshots(u_next, filename, nx_abc, nz_abc, Nboudary, n, shot);
@@ -770,7 +781,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         std::cout << "Applying Direct Wave Mute to the seismogram of shot " << shot << std::endl;
 
-        directWaveMute(seismogram_shot, nt, dt, shot, receivers, sx, sz, dx, dz);
+        directWaveMute(seismogram_shot, nt, dt, shot, receivers, sx, sz, dx, dz, source_delay);
 
         //------------------------------------------------------------------
         // salva o sismograma deste tiro COM MUTE, em arquivo separado
@@ -790,6 +801,9 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         file_cmp_mute.write(reinterpret_cast<char*>(seismogram_shot), nt * sizeof(float));
 
+    }
+
+#pragma acc update self(u_curr[0:N])
     }
 
     //-----------------------------------
@@ -933,7 +947,7 @@ int main()
 
     std::cout << "Starting to wavefield function!" << std::endl;
 
-    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nx_abc, nz_abc, nt, A, Nboudary, sx, sz, Nsource, receivers, nrec);
+    float *wavefield = derivates(c, dt, dx, dz, fonte, nx, nz, nx_abc, nz_abc, nt, A, Nboudary, sx, sz, Nsource, receivers, nrec, 1.0f / f0);
 
     //---------------------------------------
     // Save binary document of the simulation

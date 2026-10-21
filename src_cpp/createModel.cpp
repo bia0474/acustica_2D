@@ -8,7 +8,7 @@
 // media speeds
 //-------------------------------
 
-float* velocity(int nx, int nz, float c1, float c2, int interface_Z){
+float* velocity(int nx, int nz, float c1, float c2, float c3, int interface_Z1, int interface_Z2){
 
     float *velocity = (float*) malloc(nx * nz * sizeof(float));
 
@@ -16,11 +16,14 @@ float* velocity(int nx, int nz, float c1, float c2, int interface_Z){
 
         for(int j = 0; j < nz; j++){
 
-            if(j < interface_Z){
+            if(j < interface_Z1){
                 velocity[i * nz + j] = c1;
             }
-            else{
+            else if(j < interface_Z2){
                 velocity[i * nz + j] = c2;
+            }
+            else{
+                velocity[i * nz + j] = c3;
             }
         }
     }
@@ -77,10 +80,12 @@ int main(){
     float dt = 0.0f;
     float c1 = 0.0f;
     float c2 = 0.0f;
+    float c3 = 0.0f;
 
     int nx = 0;
     int nz = 0;
-    int interface_Z = 0;
+    int interface_Z1 = 0;
+    int interface_Z2 = 0;
     int Nboudary = 0;
 
 
@@ -94,14 +99,16 @@ int main(){
 
         sscanf(linha, "c1 = %f", &c1);
         sscanf(linha, "c2 = %f", &c2);
+        sscanf(linha, "c3 = %f", &c3);
 
-        sscanf(linha, "interface_Z = %d", &interface_Z);
+        sscanf(linha, "interface_Z1 = %d", &interface_Z1);
+        sscanf(linha, "interface_Z2 = %d", &interface_Z2);
         sscanf(linha, "Nboudary = %d", &Nboudary);
     }
 
     fclose(file_parameters);
 
-    float *c = velocity(nx, nz, c1, c2, interface_Z);
+    float *c = velocity(nx, nz, c1, c2, c3, interface_Z1, interface_Z2);
 
 //----------------------------------
 // CFL check
