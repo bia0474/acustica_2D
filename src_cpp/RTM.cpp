@@ -677,7 +677,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     //----------------------------------
 
     const float angle_step = 5.0f;
-    const int max_angle = 90;
+    const int max_angle = 40;
     const int n_angles = max_angle / angle_step;
     const int n_gathers = 1;
 

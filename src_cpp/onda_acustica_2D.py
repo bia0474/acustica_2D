@@ -1130,7 +1130,7 @@ plt.show()
 
 outdir = "/home/processamento/acustica_2D/outputs"
 angle_step = 5
-n_angle_bins = 18  # bins de 0 a 90 graus, com passo de 5 graus
+n_angle_bins = 8  # bins de 0 a 40 graus, com passo de 5 graus
 
 #-----------------------------------------------
 # le o arquivo unico (ja combina todos os shots empilhados)

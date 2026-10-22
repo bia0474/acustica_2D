@@ -22,17 +22,18 @@ typedef struct
 // function that performs Direct Wave Mute 
 //----------------------------------------
 
-void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver *receivers, int *sx, int *sz, float dx, float dz, float source_delay){
+void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver *receivers, int *sx, int *sz, float dx, float dz){
 
     float v_direct = 1500.0f;
-    float window   = 0.10f;
+    float shift = 0.125f;
+    float window   = 0.05f;
 
     float dz_rec = (receivers[shot].z - sz[shot]) * dz;
     float dx_rec = (receivers[shot].x - sx[shot]) * dx;
 
     float dist = std::sqrt(dz_rec * dz_rec + dx_rec * dx_rec);
 
-    float traveltime = source_delay + (dist / v_direct);
+    float traveltime = (dist / v_direct) + shift;
 
     float t1 = traveltime;
     float t2 = t1 + window;
@@ -781,7 +782,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
         std::cout << "Applying Direct Wave Mute to the seismogram of shot " << shot << std::endl;
 
-        directWaveMute(seismogram_shot, nt, dt, shot, receivers, sx, sz, dx, dz, source_delay);
+        directWaveMute(seismogram_shot, nt, dt, shot, receivers, sx, sz, dx, dz);
 
         //------------------------------------------------------------------
         // salva o sismograma deste tiro COM MUTE, em arquivo separado
