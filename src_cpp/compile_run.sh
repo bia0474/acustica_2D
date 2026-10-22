@@ -6,10 +6,6 @@ FLAGS="-O3"
 #g++ createGeometry.cpp -o geometry
 #g++ createModel.cpp -o velocityModel
 
-cd "$(dirname "$0")" || exit 1
-
-export ACC_NUM_CORES=$(nproc)
-
 nvc++ onda_acustica_2D_4_ordem.cpp $FLAGS -acc=multicore -Minfo=acc -o runAcustica2D || exit 1
 
 time ./runAcustica2D

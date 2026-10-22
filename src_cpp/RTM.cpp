@@ -36,11 +36,16 @@ void opticalFlow(float *ux, float *uz, const float *px, const float *pz, const f
     std::copy(ux, ux + nx_abc * nz_abc, ux_temp);
     std::copy(uz, uz + nx_abc * nz_abc, uz_temp);
 
+    float *ux_current = ux;
+    float *uz_current = uz;
+    float *ux_next = ux_temp;
+    float *uz_next = uz_temp;
+
     const int N = nx_abc * nz_abc;
 #pragma acc data copyin(px[0:N], pz[0:N], pt[0:N]) copy(ux[0:N], uz[0:N], ux_temp[0:N], uz_temp[0:N])
     for (int iter = 0; iter < n_iter; iter++)
     {
-#pragma acc parallel loop collapse(2) present(px[0:N], pz[0:N], pt[0:N], ux[0:N], uz[0:N], ux_temp[0:N], uz_temp[0:N])
+#pragma acc parallel loop collapse(2)
         for (int j = 2; j < nx_abc - 2; j++)
         {
             for (int i = 2; i < nz_abc - 2; i++)
@@ -52,35 +57,37 @@ void opticalFlow(float *ux, float *uz, const float *px, const float *pz, const f
                 {
                     for (int b = -1; b <= 1; b++)
                     {
-                        sum_ux += ux[(j + a) * nz_abc + (i + b)];
-                        sum_uz += uz[(j + a) * nz_abc + (i + b)];
+                        sum_ux += ux_current[(j + a) * nz_abc + (i + b)];
+                        sum_uz += uz_current[(j + a) * nz_abc + (i + b)];
                     }
                 }
 
-                const float ux_average = (1.0f / 12.0f) * (ux[j * nz_abc + i - nz_abc] + ux[j * nz_abc + i + nz_abc] + ux[j * nz_abc + i - 1] + ux[j * nz_abc + i + 1] - ux[j * nz_abc + i] + sum_ux);
-                const float uz_average = (1.0f / 12.0f) * (uz[j * nz_abc + i - nz_abc] + uz[j * nz_abc + i + nz_abc] + uz[j * nz_abc + i - 1] + uz[j * nz_abc + i + 1] - uz[j * nz_abc + i] + sum_uz);
+                const float ux_average = (1.0f / 12.0f) * (ux_current[j * nz_abc + i - nz_abc] + ux_current[j * nz_abc + i + nz_abc] + ux_current[j * nz_abc + i - 1] + ux_current[j * nz_abc + i + 1] - ux_current[j * nz_abc + i] + sum_ux);
+                const float uz_average = (1.0f / 12.0f) * (uz_current[j * nz_abc + i - nz_abc] + uz_current[j * nz_abc + i + nz_abc] + uz_current[j * nz_abc + i - 1] + uz_current[j * nz_abc + i + 1] - uz_current[j * nz_abc + i] + sum_uz);
                 const float denominator = alpha * alpha + px[j * nz_abc + i] * px[j * nz_abc + i] + pz[j * nz_abc + i] * pz[j * nz_abc + i];
 
                 if (denominator > 0.0f)
                 {
                     const float correction = (px[j * nz_abc + i] * ux_average + pz[j * nz_abc + i] * uz_average + pt[j * nz_abc + i]) / denominator;
-                    ux_temp[j * nz_abc + i] = ux_average - px[j * nz_abc + i] * correction;
-                    uz_temp[j * nz_abc + i] = uz_average - pz[j * nz_abc + i] * correction;
+                    ux_next[j * nz_abc + i] = ux_average - px[j * nz_abc + i] * correction;
+                    uz_next[j * nz_abc + i] = uz_average - pz[j * nz_abc + i] * correction;
                 }
                 else
                 {
-                    ux_temp[j * nz_abc + i] = ux_average;
-                    uz_temp[j * nz_abc + i] = uz_average;
+                    ux_next[j * nz_abc + i] = ux_average;
+                    uz_next[j * nz_abc + i] = uz_average;
                 }
             }
         }
 
-#pragma acc parallel loop present(ux[0:N], uz[0:N], ux_temp[0:N], uz_temp[0:N])
-        for (int k = 0; k < N; k++)
-        {
-            ux[k] = ux_temp[k];
-            uz[k] = uz_temp[k];
-        }
+        std::swap(ux_current, ux_next);
+        std::swap(uz_current, uz_next);
+    }
+
+    if (ux_current != ux)
+    {
+        std::copy(ux_current, ux_current + nx_abc * nz_abc, ux);
+        std::copy(uz_current, uz_current + nx_abc * nz_abc, uz);
     }
 
     free(ux_temp);
@@ -718,8 +725,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         std::fill(ux_back, ux_back + nx_abc * nz_abc, 0.0f);
         std::fill(uz_back, uz_back + nx_abc * nz_abc, 0.0f);
 
-#pragma acc update device(u_curr[0:N], u_next[0:N], u_back_curr[0:N], u_back_next[0:N], px_fwd[0:N], pz_fwd[0:N], pt_fwd[0:N], ux_fwd[0:N], uz_fwd[0:N], px_back[0:N], pz_back[0:N], pt_back[0:N], ux_back[0:N], uz_back[0:N])
-
         //-----------------------------------
         // trace with mute 
         //-----------------------------------
@@ -750,11 +755,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             // space loop - 4nd order
             //----------------------------------
 
-            const int source_x = sx[shot];
-            const int source_z = sz[shot];
-            const float source_amplitude = fonte[n] / (dx * dz);
-
-#pragma acc parallel loop collapse(2) firstprivate(source_x, source_z, source_amplitude)
+#pragma acc parallel loop collapse(2)
             for (int j = 2; j < nx_abc - 2; j++)
             { // traverses all points of the grid in X
 
@@ -768,14 +769,16 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     float d2x = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] - u_curr[(j - 2) * nz_abc + i]) / (12 * dx * dx);
 
                     float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i - 1)] - u_curr[j * nz_abc + (i - 2)]) / (12 * dz * dz);
-                    u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
 
-                    if (j == source_x && i == source_z)
-                    {
-                        u_next[j * nz_abc + i] += source_amplitude;
-                    }
+                    u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
                 }
             }
+
+            //----------------------------------
+            // source injection (just one source)
+            //----------------------------------
+
+            u_next[sx[shot] * nz_abc + sz[shot]] += (fonte[n]) / (dx * dz);
 
             //-----------------------------------
             // CERJAN
@@ -859,7 +862,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             {
                 std::fill(ux_fwd, ux_fwd + nx_abc * nz_abc, 0.0f);
                 std::fill(uz_fwd, uz_fwd + nx_abc * nz_abc, 0.0f);
-#pragma acc update device(ux_fwd[0:N], uz_fwd[0:N])
 
                 opticalFlow(ux_fwd, uz_fwd, px_fwd, pz_fwd, pt_fwd, nx_abc, nz_abc, alpha, n_iter);
             }
@@ -878,7 +880,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 std::string filenamex = "../outputs/PV+OF_fwd_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
                 std::string filenamez = "../outputs/PV+OF_fwd_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
 
-#pragma acc update self(ux_fwd[0:N], uz_fwd[0:N])
                 saveSnapshots(filenamex, filenamez, nx_abc, nz_abc, Nboudary, n, shot, ux_fwd, uz_fwd);
 
             }
@@ -901,12 +902,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             // space loop - 4th order
             //----------------------------------
 
-            const int receiver_x = receivers[shot].x;
-            const int receiver_z = receivers[shot].z;
-            const int time_index = nt - 1 - n;
-            const float receiver_amplitude = seismogram_shot[time_index] / (dx * dz);
-
-#pragma acc parallel loop collapse(2) firstprivate(receiver_x, receiver_z, receiver_amplitude)
+#pragma acc parallel loop collapse(2)
             for (int j = 2; j < nx_abc - 2; j++)
             {
                 for (int i = 2; i < nz_abc - 2; i++)
@@ -917,12 +913,20 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                     u_back_next[j * nz_abc + i] = 2 * u_back_curr[j * nz_abc + i] - u_back_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
 
-                    if (j == receiver_x && i == receiver_z)
-                    {
-                        u_back_next[j * nz_abc + i] += receiver_amplitude;
-                    }
                 }
             }
+
+            //----------------------------------
+            // injection energy to the grid
+            //----------------------------------
+            // The values ​​recorded on the seismogram are read at the receiver positions in reverse order and injected.
+
+            int xr = receivers[shot].x;
+            int zr = receivers[shot].z;
+
+            int time_index = nt - 1 - n;
+
+            u_back_next[xr * nz_abc + zr] += seismogram_shot[time_index] / (dx * dz);
 
             //-----------------------------------
             // CERJAN
@@ -1000,7 +1004,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             {
 
                 std::fill(ux_back, ux_back + nx_abc * nz_abc, 0.0f);
-#pragma acc update device(ux_back[0:N], uz_back[0:N])
+                std::fill(uz_back, uz_back + nx_abc * nz_abc, 0.0f);
 
                 int n_iter = 20;
                 float alpha = 1.0f;
@@ -1023,7 +1027,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 std::string filename_pv_of_x = "../outputs/PV+OF_back_x" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
                 std::string filename_pv_of_z = "../outputs/PV+OF_back_z" + std::to_string(n) + "_shot " + std::to_string(shot) + ".bin";
 
-#pragma acc update self(u_back_next[0:N], ux_back[0:N], uz_back[0:N])
                 saveWavefieldAndOpticalFlowSnapshots(filename_snapshot, filename_pv_of_x, filename_pv_of_z, nx_abc, nz_abc, Nboudary, u_back_next, ux_back, uz_back);
             }
 
@@ -1051,7 +1054,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
                 fwd_file.close();
 
-#pragma acc update device(u_fwd_n[0:image_size])
 #pragma acc parallel loop collapse(2)
                 for (int x = 0; x < nx; x++)
                 {

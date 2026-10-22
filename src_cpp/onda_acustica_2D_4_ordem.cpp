@@ -25,8 +25,8 @@ typedef struct
 void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver *receivers, int *sx, int *sz, float dx, float dz){
 
     float v_direct = 1500.0f;
-    float shift = 0.125f;
-    float window   = 0.05f;
+    float shift = 0.48f;
+    float window   = 0.1f;
 
     float dz_rec = (receivers[shot].z - sz[shot]) * dz;
     float dx_rec = (receivers[shot].x - sx[shot]) * dx;
@@ -613,12 +613,14 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     std::ofstream file_cmp_mute("../outputs/cmp_gather_mute.bin", std::ios::binary);
 
     const int N = nx_abc * nz_abc;
+    bool current_is_u_curr = true;
 
 #pragma acc data copyin(c[0:N], A[0:Nboudary], fonte[0:nt]) copy(u_curr[0:N], u_next[0:N])
     {
     for (int shot = 0; shot < Nshots; shot++)
     {
         std::cout << "Tiro " << shot << "\n";
+        current_is_u_curr = true;
 
 #pragma acc parallel loop present(u_curr[0:N], u_next[0:N])
         for (int k = 0; k < N; k++)
@@ -640,7 +642,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             const int source_z = sz[shot];
             const float source_amplitude = fonte[n] / (dx * dz);
 
-#pragma acc parallel loop collapse(2) present(c[0:N], u_curr[0:N], u_next[0:N]) firstprivate(source_x, source_z, source_amplitude)
+#pragma acc parallel loop collapse(2) present(c[0:N], u_curr[0:N], u_next[0:N]) firstprivate(source_x, source_z, source_amplitude, current_is_u_curr)
             for (int j = 2; j < nx_abc - 2; j++)
             { // traverses all points of the grid in X
 
@@ -651,14 +653,14 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                     // finite differences
                     //----------------------------------
 
-                    float d2x = (-u_curr[(j + 2) * nz_abc + i] + 16 * u_curr[(j + 1) * nz_abc + i] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[(j - 1) * nz_abc + i] - u_curr[(j - 2) * nz_abc + i]) / (12 * dx * dx);
-
-                    float d2z = (-u_curr[j * nz_abc + (i + 2)] + 16 * u_curr[j * nz_abc + (i + 1)] - 30 * u_curr[j * nz_abc + i] + 16 * u_curr[j * nz_abc + (i - 1)] - u_curr[j * nz_abc + (i - 2)]) / (12 * dz * dz);
-                    u_next[j * nz_abc + i] = 2 * u_curr[j * nz_abc + i] - u_next[j * nz_abc + i] + c[j * nz_abc + i] * c[j * nz_abc + i] * dt * dt * (d2x + d2z);
+                    const int k = j * nz_abc + i;
+                    const float d2x = (-(current_is_u_curr ? u_curr[(j + 2) * nz_abc + i] : u_next[(j + 2) * nz_abc + i]) + 16 * (current_is_u_curr ? u_curr[(j + 1) * nz_abc + i] : u_next[(j + 1) * nz_abc + i]) - 30 * (current_is_u_curr ? u_curr[k] : u_next[k]) + 16 * (current_is_u_curr ? u_curr[(j - 1) * nz_abc + i] : u_next[(j - 1) * nz_abc + i]) - (current_is_u_curr ? u_curr[(j - 2) * nz_abc + i] : u_next[(j - 2) * nz_abc + i])) / (12 * dx * dx);
+                    const float d2z = (-(current_is_u_curr ? u_curr[j * nz_abc + (i + 2)] : u_next[j * nz_abc + (i + 2)]) + 16 * (current_is_u_curr ? u_curr[j * nz_abc + (i + 1)] : u_next[j * nz_abc + (i + 1)]) - 30 * (current_is_u_curr ? u_curr[k] : u_next[k]) + 16 * (current_is_u_curr ? u_curr[j * nz_abc + (i - 1)] : u_next[j * nz_abc + (i - 1)]) - (current_is_u_curr ? u_curr[j * nz_abc + (i - 2)] : u_next[j * nz_abc + (i - 2)])) / (12 * dz * dz);
+                    (current_is_u_curr ? u_next[k] : u_curr[k]) = 2 * (current_is_u_curr ? u_curr[k] : u_next[k]) - (current_is_u_curr ? u_next[k] : u_curr[k]) + c[k] * c[k] * dt * dt * (d2x + d2z);
 
                     if (j == source_x && i == source_z)
                     {
-                        u_next[j * nz_abc + i] += source_amplitude;
+                        (current_is_u_curr ? u_next[k] : u_curr[k]) += source_amplitude;
                     }
 
                 }
@@ -727,8 +729,8 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             int zr = receivers[shot].z;
             const int receiver_index = xr * nz_abc + zr;
 
-#pragma acc update self(u_next[receiver_index:1])
-            seismogram_shot[n] = u_next[receiver_index];
+#pragma acc update self(u_curr[receiver_index:1], u_next[receiver_index:1])
+            seismogram_shot[n] = current_is_u_curr ? u_next[receiver_index] : u_curr[receiver_index];
             
             //-------------------------------------------------------
             // save the snapshots of the forward field (binary document)
@@ -742,17 +744,17 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
             if (n % 10 == 0)
             {
                 // Snapshots are written by the host.
-#pragma acc update self(u_next[0:N])
+#pragma acc update self(u_curr[0:N], u_next[0:N])
                 std::string filename = "../outputs/snapshot_fwd_" + std::to_string(n) + "_shot_" + std::to_string(shot) + ".bin";
                 
-                saveSnapshots(u_next, filename, nx_abc, nz_abc, Nboudary, n, shot);
+                saveSnapshots(current_is_u_curr ? u_next : u_curr, filename, nx_abc, nz_abc, Nboudary, n, shot);
             }
 
             //----------------------------------
             // advance in time
             //----------------------------------
 
-            std::swap(u_curr, u_next);
+            current_is_u_curr = !current_is_u_curr;
 
         }
 
@@ -804,7 +806,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
 
     }
 
-#pragma acc update self(u_curr[0:N])
+#pragma acc update self(u_curr[0:N], u_next[0:N])
     }
 
     //-----------------------------------
@@ -826,7 +828,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     for (int i = 0; i < nx_abc * nz_abc; i++)
     {
 
-        result[i] = u_curr[i];
+        result[i] = current_is_u_curr ? u_curr[i] : u_next[i];
     }
 
     free(u_curr);
