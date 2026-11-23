@@ -25,7 +25,7 @@ typedef struct
 void directWaveMute(float *seismogram_shot, int nt, float dt, int shot, Receiver *receivers, int *sx, int *sz, float dx, float dz){
 
     float v_direct = 1500.0f;
-    float shift = 0.48f;
+    float shift = 0.3f;
     float window   = 0.1f;
 
     float dz_rec = (receivers[shot].z - sz[shot]) * dz;

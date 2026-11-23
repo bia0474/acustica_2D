@@ -1,4 +1,5 @@
 #include <cmath>
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
@@ -8,23 +9,22 @@
 // media speeds
 //-------------------------------
 
-float* velocity(int nx, int nz, float c1, float c2, float c3, int interface_Z1, int interface_Z2){
+float* velocity(int nx, int nz, float c1, float c2, float c3, int interface_Z1, int interface_Z2, float smoothing_sigma_cells){
 
     float *velocity = (float*) malloc(nx * nz * sizeof(float));
+    const float interface1_position = interface_Z1 - 0.5f;
+    const float interface2_position = interface_Z2 - 0.5f;
+    const float erf_scale = std::sqrt(2.0f) * smoothing_sigma_cells;
 
     for(int i = 0; i < nx; i++){
 
         for(int j = 0; j < nz; j++){
 
-            if(j < interface_Z1){
-                velocity[i * nz + j] = c1;
-            }
-            else if(j < interface_Z2){
-                velocity[i * nz + j] = c2;
-            }
-            else{
-                velocity[i * nz + j] = c3;
-            }
+            const float blend1 = 0.5f * (1.0f + std::erf((j - interface1_position) / erf_scale));
+            const float blend2 = 0.5f * (1.0f + std::erf((j - interface2_position) / erf_scale));
+            const float value = c1 + blend1 * (c2 - c1) + blend2 * (c3 - c2);
+
+            velocity[i * nz + j] = value;
         }
     }
 
@@ -108,7 +108,8 @@ int main(){
 
     fclose(file_parameters);
 
-    float *c = velocity(nx, nz, c1, c2, c3, interface_Z1, interface_Z2);
+    const float smoothing_sigma_cells = 6.0f;
+    float *c = velocity(nx, nz, c1, c2, c3, interface_Z1, interface_Z2, smoothing_sigma_cells);
 
 //----------------------------------
 // CFL check
@@ -127,10 +128,10 @@ int main(){
 // Save the velocity model as binary (.bin)
 //------------------------------------------
 
-    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModel.bin", "wb"); // "wb" = write binary
+    FILE *file_velocities = fopen("/home/processamento/acustica_2D/inputs/velocityModelSuavizado.bin", "wb"); // "wb" = write binary
 
     if(file_velocities == NULL){
-        printf("Erro ao abrir velocityModel.bin\n");
+        printf("Erro ao abrir velocityModelSuavizado.bin\n");
         return 1;
     }
 
