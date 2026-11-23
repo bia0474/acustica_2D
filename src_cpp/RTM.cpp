@@ -5,7 +5,6 @@
 #include <string>
 #include <algorithm>
 #include <stdlib.h>
-#include <vector>
 
 //-------------------------------
 // Struct of the receivers
@@ -685,7 +684,7 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     //----------------------------------
 
     const float angle_step = 5.0f;
-    const int max_angle = 90;
+    const int max_angle = 40;
     const int n_angles = max_angle / angle_step;
     const int n_gathers = 1;
 
@@ -697,21 +696,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     float *uz_fwd_n = (float *)calloc(nx * nz, sizeof(float));
 
     float *theta = (float *)calloc(nx * nz, sizeof(float));
-
-    std::vector<float> image_isic_grad(image_size, 0.0f);
-    std::vector<float> image_isic_dt(image_size, 0.0f);
-    std::vector<float> image_adcig_isic_grad(n_angles * n_gathers * nz, 0.0f);
-    std::vector<float> image_adcig_isic_dt(n_angles * n_gathers * nz, 0.0f);
-
-    std::vector<float> fwd_snapshot_prev(image_size, 0.0f);
-    std::vector<float> fwd_snapshot_prev2(image_size, 0.0f);
-    std::vector<float> fwd_ux_prev(image_size, 0.0f);
-    std::vector<float> fwd_uz_prev(image_size, 0.0f);
-    std::vector<float> back_snapshot_current(image_size, 0.0f);
-    std::vector<float> back_snapshot_prev(image_size, 0.0f);
-    std::vector<float> back_snapshot_prev2(image_size, 0.0f);
-    std::vector<float> back_ux_prev(image_size, 0.0f);
-    std::vector<float> back_uz_prev(image_size, 0.0f);
 
     //-----------------------------------
     // FORWARD FIELD
@@ -740,16 +724,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
         std::fill(pt_back, pt_back + nx_abc * nz_abc, 0.0f);
         std::fill(ux_back, ux_back + nx_abc * nz_abc, 0.0f);
         std::fill(uz_back, uz_back + nx_abc * nz_abc, 0.0f);
-        std::fill(fwd_snapshot_prev.begin(), fwd_snapshot_prev.end(), 0.0f);
-        std::fill(fwd_snapshot_prev2.begin(), fwd_snapshot_prev2.end(), 0.0f);
-        std::fill(fwd_ux_prev.begin(), fwd_ux_prev.end(), 0.0f);
-        std::fill(fwd_uz_prev.begin(), fwd_uz_prev.end(), 0.0f);
-        std::fill(back_snapshot_prev.begin(), back_snapshot_prev.end(), 0.0f);
-        std::fill(back_snapshot_prev2.begin(), back_snapshot_prev2.end(), 0.0f);
-        std::fill(back_ux_prev.begin(), back_ux_prev.end(), 0.0f);
-        std::fill(back_uz_prev.begin(), back_uz_prev.end(), 0.0f);
-        int isic_history_count = 0;
-
         //-----------------------------------
         // trace with mute 
         //-----------------------------------
@@ -1197,104 +1171,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
                 }
             }
 
-            if (fwd_index != 0 && fwd_index % 10 == 0)
-            {
-                #pragma acc update self(u_back_next[0:N])
-
-                // ISIC is evaluated one snapshot interval later so centered
-                // derivatives are available for both time-reversed fields.
-                if (isic_history_count >= 2)
-                {
-                    const float snapshot_dt = 10.0f * dt;
-                    const float time_weight = snapshot_dt;
-                    float max_amp_fwd_isic = 0.0f;
-                    float max_amp_back_isic = 0.0f;
-
-                    for (int x = 0; x < nx; x++)
-                    {
-                        for (int z = 0; z < nz; z++)
-                        {
-                            const int index = x * nz + z;
-                            const int padded_index = (x + Nboudary) * nz_abc + (z + Nboudary);
-                            back_snapshot_current[index] = u_back_next[padded_index];
-
-                            const float fwd_magnitude = std::hypot(fwd_ux_prev[index], fwd_uz_prev[index]);
-                            const float back_magnitude = std::hypot(back_ux_prev[index], back_uz_prev[index]);
-                            max_amp_fwd_isic = std::max(max_amp_fwd_isic, fwd_magnitude);
-                            max_amp_back_isic = std::max(max_amp_back_isic, back_magnitude);
-                        }
-                    }
-
-                    const float thresh_fwd_isic = 1e-5f * max_amp_fwd_isic;
-                    const float thresh_back_isic = 1e-5f * max_amp_back_isic;
-
-                    for (int x = 1; x < nx - 1; x++)
-                    {
-                        for (int z = 1; z < nz - 1; z++)
-                        {
-                            const int index = x * nz + z;
-                            const float source_x = (fwd_snapshot_prev[(x + 1) * nz + z] - fwd_snapshot_prev[(x - 1) * nz + z]) / (2.0f * dx);
-                            const float source_z = (fwd_snapshot_prev[x * nz + z + 1] - fwd_snapshot_prev[x * nz + z - 1]) / (2.0f * dz);
-                            const float receiver_x = (back_snapshot_prev[(x + 1) * nz + z] - back_snapshot_prev[(x - 1) * nz + z]) / (2.0f * dx);
-                            const float receiver_z = (back_snapshot_prev[x * nz + z + 1] - back_snapshot_prev[x * nz + z - 1]) / (2.0f * dz);
-
-                            // Snapshot indices run opposite to physical time for both fields.
-                            const float source_dt = (fwd_snapshot_prev2[index] - u_fwd_n[index]) / (2.0f * snapshot_dt);
-                            const float receiver_dt = (back_snapshot_prev2[index] - back_snapshot_current[index]) / (2.0f * snapshot_dt);
-                            const float velocity = c[(x + Nboudary) * nz_abc + (z + Nboudary)];
-
-                            const float image_grad = (source_x * receiver_x + source_z * receiver_z) * time_weight;
-                            const float image_dt = (source_dt * receiver_dt / (velocity * velocity)) * time_weight;
-                            image_isic_grad[index] += image_grad;
-                            image_isic_dt[index] += image_dt;
-
-                            const float source_magnitude = std::hypot(fwd_ux_prev[index], fwd_uz_prev[index]);
-                            const float receiver_magnitude = std::hypot(back_ux_prev[index], back_uz_prev[index]);
-                            if (source_magnitude <= thresh_fwd_isic || receiver_magnitude <= thresh_back_isic)
-                            {
-                                continue;
-                            }
-
-                            float cos_2theta = (fwd_ux_prev[index] * back_ux_prev[index] + fwd_uz_prev[index] * back_uz_prev[index]) / (source_magnitude * receiver_magnitude);
-                            if (cos_2theta > 1.0f) cos_2theta = 1.0f;
-                            if (cos_2theta < -1.0f) cos_2theta = -1.0f;
-                            const float opening_angle = 0.5f * std::acos(cos_2theta) * 180.0f / M_PI;
-                            if (opening_angle < 0.0f || opening_angle >= max_angle)
-                            {
-                                continue;
-                            }
-
-                            const int bin_angle = static_cast<int>(opening_angle / angle_step);
-                            const int adcig_index = bin_angle * n_gathers * nz + z;
-                            image_adcig_isic_grad[adcig_index] += image_grad;
-                            image_adcig_isic_dt[adcig_index] += image_dt;
-                        }
-                    }
-                }
-
-                for (int index = 0; index < image_size; index++)
-                {
-                    fwd_snapshot_prev2[index] = fwd_snapshot_prev[index];
-                    fwd_snapshot_prev[index] = u_fwd_n[index];
-                    fwd_ux_prev[index] = ux_fwd_n[index];
-                    fwd_uz_prev[index] = uz_fwd_n[index];
-                }
-
-                for (int x = 0; x < nx; x++)
-                {
-                    for (int z = 0; z < nz; z++)
-                    {
-                        const int index = x * nz + z;
-                        const int padded_index = (x + Nboudary) * nz_abc + (z + Nboudary);
-                        back_snapshot_prev2[index] = back_snapshot_prev[index];
-                        back_snapshot_prev[index] = u_back_next[padded_index];
-                        back_ux_prev[index] = ux_back[padded_index];
-                        back_uz_prev[index] = uz_back[padded_index];
-                    }
-                }
-                isic_history_count++;
-            }
-
             //----------------------------------
             // advance in time
             //----------------------------------
@@ -1362,57 +1238,6 @@ float *derivates(float *c, float dt, float dx, float dz, const float *fonte, int
     out_file.close();
 
     std::cout << "Salvo: " << filename << std::endl;
-
-    std::vector<float> image_isic_grad_shots(image_size);
-    std::vector<float> image_isic_dt_shots(image_size);
-    std::vector<float> image_isic(image_size);
-    // The article recommends testing the relative polarity of the two terms.
-    for (int i = 0; i < image_size; i++)
-    {
-        image_isic_grad_shots[i] = image_isic_grad[i] / static_cast<float>(Nshots);
-        image_isic_dt_shots[i] = image_isic_dt[i] / static_cast<float>(Nshots);
-        image_isic[i] = 0.5f * (image_isic_grad_shots[i] - image_isic_dt_shots[i]);
-    }
-
-    std::vector<float> image_adcig_isic_grad_shots(n_angles * n_gathers * nz);
-    std::vector<float> image_adcig_isic_dt_shots(n_angles * n_gathers * nz);
-    std::vector<float> image_adcig_isic(n_angles * n_gathers * nz);
-    for (int i = 0; i < n_angles * n_gathers * nz; i++)
-    {
-        image_adcig_isic_grad_shots[i] = image_adcig_isic_grad[i] / static_cast<float>(Nshots);
-        image_adcig_isic_dt_shots[i] = image_adcig_isic_dt[i] / static_cast<float>(Nshots);
-        image_adcig_isic[i] = 0.5f * (image_adcig_isic_grad_shots[i] - image_adcig_isic_dt_shots[i]);
-    }
-
-    const auto write_isic_output = [](const std::string &path, const std::vector<float> &data)
-    {
-        std::ofstream file(path, std::ios::binary);
-        if (!file.is_open())
-        {
-            std::cerr << "ERRO: nao conseguiu salvar " << path << std::endl;
-            return false;
-        }
-
-        file.write(reinterpret_cast<const char *>(data.data()), data.size() * sizeof(float));
-        if (!file)
-        {
-            std::cerr << "ERRO: escrita incompleta em " << path << std::endl;
-            return false;
-        }
-        return true;
-    };
-
-    if (!write_isic_output("../outputs/image_ISIC_grad.bin", image_isic_grad_shots) ||
-        !write_isic_output("../outputs/image_ISIC_dt.bin", image_isic_dt_shots) ||
-        !write_isic_output("../outputs/image_ISIC.bin", image_isic) ||
-        !write_isic_output("../outputs/image_migrated_ADCIG_ISIC_grad.bin", image_adcig_isic_grad_shots) ||
-        !write_isic_output("../outputs/image_migrated_ADCIG_ISIC_dt.bin", image_adcig_isic_dt_shots) ||
-        !write_isic_output("../outputs/image_migrated_ADCIG_ISIC.bin", image_adcig_isic))
-    {
-        return nullptr;
-    }
-
-    std::cout << "Salvos: imagens ISIC (I_grad, I_dt e combinada), incluindo ADCIGs" << std::endl;
 
     free(u_curr);
     free(u_next);

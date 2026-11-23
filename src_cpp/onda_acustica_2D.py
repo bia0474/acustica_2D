@@ -1130,24 +1130,21 @@ plt.show()
 
 outdir = "/home/processamento/acustica_2D/outputs"
 angle_step = 5
-adcig_file = f"{outdir}/image_migrated_ADCIG_ISIC.bin"
+max_angle = 40
+n_angle_bins = max_angle // angle_step
 
 #-----------------------------------------------
 # le o arquivo unico (ja combina todos os shots empilhados)
 #-----------------------------------------------
 
-panel_data_flat = np.fromfile(adcig_file, dtype=np.float32)
+panel_data_flat = np.fromfile(f"{outdir}/image_migrated_ADCIG.bin", dtype=np.float32)
 
 n_floats = panel_data_flat.size
+expected = n_angle_bins * nz
 
-if n_floats % nz != 0:
-    raise ValueError(
-        f"Tamanho lido ({n_floats}) nao e divisivel por nz ({nz}). "
-        f"Confira o arquivo {adcig_file} e o valor de nz."
-    )
+if n_floats != expected:
+    raise ValueError(f"Tamanho lido ({n_floats}) nao bate com n_angle_bins*nz ({expected}). "f"Confira n_angle_bins ou nz.")
 
-n_angle_bins = n_floats // nz
-max_angle = n_angle_bins * angle_step
 panel_data = panel_data_flat.reshape(n_angle_bins, nz).T  # (nz, n_angle_bins), mesmo formato usado no plot
 
 #-----------------------------------------------
@@ -1190,7 +1187,7 @@ else:
 ax.set_ylabel("z (m)")
 ax.set_xlabel("Ângulo de abertura (graus)")
 ax.set_xticks(np.arange(0, max_angle + angle_step, angle_step))
-ax.set_title("ADCIG ISIC - CMP empilhado", fontsize=14, fontweight="bold")
+ax.set_title("ADCIG - CMP empilhado", fontsize=14, fontweight="bold")
 ax.set_xlim(0, n_angle_bins * angle_step)
 
 plt.tight_layout()
